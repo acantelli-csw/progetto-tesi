@@ -1,0 +1,8 @@
+openai
+langchain
+langchain-community
+langchain-openai
+pyodbc
+pandas
+python-dotenv
+tqdm
