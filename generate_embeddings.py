@@ -3,39 +3,22 @@ from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from PIL import Image
 from io import BytesIO
-import pyodbc
+import db_connection
 import pytesseract
 import textract
 
+
 # Leggi tutti i documenti dal DB
-conn_str = (
-    "DRIVER={SQL Server};"
-    "SERVER=CSW-021;"                       # nome o IP del server
-    "DATABASE=BPM;"                         # nome del DB
-    "UID=sa;"                               # SQL login
-    "PWD=1Password1;"                       # password SQL
-    "Encrypt=optional;"                     
-    "TrustServerCertificate=yes;"
-#   "Connection Timeout=30;"
-)
+conn = db_connection.get_connection()
+cursor = conn.cursor()
 
-try:
-    conn = pyodbc.connect(conn_str)
-    print("Connessione avvenuta con successo!")
-except Exception as e:
-    print("Errore di connessione:", e)
+# TODO: fix the query to fetch documents
+# cursor.execute("SELECT id, filename, extension, filedata FROM Files WHERE embedding IS NULL")
+cursor.execute("SELECT ID, StringValue FROM VAR_INVIO_EMAIL_VALUTAZIONE WHERE VariableName = 'Email'")
+rows = cursor.fetchall()
 
-cursor=conn.cursor()
-with conn.cursor() as cur:
-
-    # TODO: fix the query to fetch documents
-    # cursor.execute("SELECT id, filename, extension, filedata FROM Files WHERE embedding IS NULL")
-    cur.execute("SELECT ID, StringValue FROM VAR_INVIO_EMAIL_VALUTAZIONE WHERE VariableName = 'Email'")
-
-    rows = cur.fetchall()
-
-    for r in rows:
-        print(r)
+# for r in rows:
+#     print(r)
 
 
 # Estrai testo dai documenti in base all'estensione
