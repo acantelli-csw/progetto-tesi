@@ -6,7 +6,7 @@ from io import BytesIO
 import db_connection
 import pytesseract
 import textract
-
+import pytesseract
 
 # Leggi tutti i documenti dal DB
 conn = db_connection.get_connection()
@@ -56,8 +56,10 @@ def extract_text_from_varbinary(file_blob, extension):
     else:
         return ""
     
+    
+# TODO: Gestione seprata delle immagini all'interno dei documenti
 
-# Chunking e generazione embedding
+# Chunking e generazione embedding - SOLO TESTO
 import embedding
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
 

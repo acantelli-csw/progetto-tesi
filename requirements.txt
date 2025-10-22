@@ -1,6 +1,3 @@
-pip<24.1
-textract
-
 openai
 langchain
 langchain-community
@@ -11,3 +8,12 @@ python-dotenv
 tqdm
 pytesseract
 pillow
+pytesseract
+docx
+
+pip<24.1
+textract
+
+pip>=25.2
+fitz
+pdfplumber
