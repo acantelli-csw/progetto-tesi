@@ -56,10 +56,8 @@ def extract_text_from_varbinary(file_blob, extension):
     else:
         return ""
     
-    
-# TODO: Gestione seprata delle immagini all'interno dei documenti
 
-# Chunking e generazione embedding - SOLO TESTO
+# Chunking e generazione embedding - SOLO TESTO (Immagini ignorate)
 import embedding
 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
 
