@@ -8,6 +8,8 @@ import pytesseract
 import textract
 import pytesseract
 
+# Elaborazione file - SOLO TESTO
+
 # Leggi tutti i documenti dal DB
 conn = db_connection.get_connection()
 cursor = conn.cursor()

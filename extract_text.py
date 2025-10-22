@@ -101,7 +101,7 @@ def extract_text_from_varbinary(file_bytes, extension):
 
         # Caso non gestito
         else:
-            print(f"⚠️ Estensione non gestita: {ext}")
+            print(f"Estensione non gestita: {ext}")
             full_text = ""
 
 
@@ -110,5 +110,5 @@ def extract_text_from_varbinary(file_bytes, extension):
         return full_text
 
     except Exception as e:
-        print(f"❌ Errore elaborando file .{ext}: {e}")
+        print(f"Errore elaborando file .{ext}: {e}")
         return ""
