@@ -3,6 +3,7 @@ import json
 import db_connection
 
 # TODO: add new type of similarity searches
+
 # 1. Similarità coseno tra due vettori.
 def cosine_similarity(vec1, vec2):
     vec1 = np.array(vec1)
@@ -18,10 +19,11 @@ def similarity_search(query_embedding):
 
     cursor.execute("SELECT ID, Embedding FROM Files WHERE embedding IS NOT NULL")
     rows = cursor.fetchall()
-
+    
     docs = []
     for row in rows:
         file_id, embedding_json = row
+        # TODO: switch from json.loads to vectors in SQL 25
         embedding_vector = json.loads(embedding_json)
         docs.append({"id": file_id, "embedding": embedding_vector})
         
