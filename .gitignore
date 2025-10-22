@@ -1,0 +1,14 @@
+# virtual environment
+.venv/
+
+# secrets / environment variables
+.env
+.env.*
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Build / packaging
+*.egg-info/
+uv.lock

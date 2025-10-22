@@ -1,6 +1,6 @@
 import json
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from extract_text import extract_text_from_varbinary
+from main.docs_embedding.extract_text import extract_text_from_varbinary
 import db_connection
 import embedding
 
