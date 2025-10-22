@@ -5,8 +5,8 @@ def get_connection():
         "DRIVER={SQL Server};"
         "SERVER=CSW-021;"                       # nome o IP del server
         "DATABASE=BPM;"                         # nome del DB
-        "UID=sa;"                               # SQL login
-        "PWD=1Password1;"                       # password SQL
+        "UID={DB_HOST};"                               # SQL login
+        "PWD={DB_PASSWORD};"                       # password SQL
         "Encrypt=optional;"                     
         "TrustServerCertificate=yes;"
     #   "Connection Timeout=30;"
