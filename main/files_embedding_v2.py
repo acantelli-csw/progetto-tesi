@@ -32,7 +32,7 @@ def process_files(chunk_size = 1000, chunk_overlap = 150):
         # Calcolo embedding per ogni chunk
         embeddings = [embedding.get_embedding(chunk) for chunk in chunks]
         
-
+        
         # TODO: non aggregare i chunk, ma salvarli in una tabella separata per retrieval + ranking
         # Media dei chunk per avere un unico embedding per documento
         avg_embedding = [sum(col)/len(col) for col in zip(*embeddings)]
