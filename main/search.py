@@ -1,8 +1,8 @@
 import numpy as np
 import json
-import db_connection as db_connection
+import db_connection
+import embedding
 
-# TODO: add new type of similarity searches
 
 # 1. Similarità coseno tra due vettori.
 def cosine_similarity(vec1, vec2):
@@ -10,8 +10,11 @@ def cosine_similarity(vec1, vec2):
     vec2 = np.array(vec2)
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
+# TODO sposta similarity search sul DB usando vettori nativi di SQL 25
 
-def similarity_search(query_embedding):
+def semantic_search(prompt):
+
+    prompt_embedding = embedding.get_embedding(prompt)
 
     # Leggi tutti gli embedding dal DB
     conn = db_connection.get_connection()
@@ -28,14 +31,14 @@ def similarity_search(query_embedding):
         docs.append({"id": file_id, "embedding": embedding_vector})
         
     for doc in docs:
-        doc["similarity"] = cosine_similarity(query_embedding, doc["embedding"])
+        doc["similarity"] = cosine_similarity(prompt_embedding, doc["embedding"])
 
     # Ordina decrescente per similarità
     docs_sorted = sorted(docs, key=lambda x: x["similarity"], reverse=True)
 
     # Prendi i top N documenti più simili
     # TODO: variare N in base al grado di similarità (soglia minima) o alla lunghezza dei documenti
-    top_n = 5
+    top_n = 20
     top_docs = docs_sorted[:top_n]
 
     for d in top_docs:

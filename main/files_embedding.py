@@ -1,10 +1,8 @@
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import json
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from main.docs_embedding.extract_text import extract_text_from_varbinary
-import db_connection as db_connection
-import main.chatbot.embedding as embedding
-
-# Elaborazione file - TESTO + IMMAGINI
+import extract_text
+import db_connection
+import embedding
 
 def process_files(chunk_size = 1000, chunk_overlap = 150):
 
@@ -20,7 +18,7 @@ def process_files(chunk_size = 1000, chunk_overlap = 150):
         file_id, filename, ext, blob = row
 
         # Estrazione testo + OCR immagini interne
-        text = extract_text_from_varbinary(blob, ext)
+        text = extract_text.extract_text_from_varbinary(blob, ext)
         if not text.strip():
             print(f"Nessun testo estratto dal file: {filename}")
             continue

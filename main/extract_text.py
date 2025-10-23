@@ -6,8 +6,7 @@ import textract
 import pytesseract
 import tempfile
 import os
-import pdfplumber
-import fitz
+import fitz  
 
 
 # Estrai testo e immagini dai documenti in base all'estensione
@@ -25,7 +24,7 @@ def extract_text_from_varbinary(file_bytes, extension):
                 tmp_path = tmp.name
 
             # --- Testo nativo ---
-            with pdfplumber.open(tmp_path) as pdf:
+            with fitz.open(tmp_path) as pdf:
                 for page in pdf.pages:
                     text = page.extract_text()
                     if text:
@@ -68,7 +67,6 @@ def extract_text_from_varbinary(file_bytes, extension):
 
             os.remove(tmp_path)
 
-
         # Caso 3: DOC (conversione + testo)
         elif ext == "doc":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".doc") as tmp:
@@ -82,28 +80,10 @@ def extract_text_from_varbinary(file_bytes, extension):
             finally:
                 os.remove(tmp_path)
 
-
-        # Caso 4: TXT o INI (lettura diretta)
-        elif ext in ["txt", "ini"]:
-            try:
-                full_text = file_bytes.decode("utf-8", errors="ignore")
-            except Exception:
-                # fallback per altri encoding
-                full_text = file_bytes.decode("latin-1", errors="ignore")
-
-
-        # Caso 5: Immagini (JPG, JPEG, PNG)
-        elif ext in ["jpg", "jpeg", "png"]:
-            img = Image.open(BytesIO(file_bytes))
-            ocr_text = pytesseract.image_to_string(img)
-            full_text += ocr_text
-
-
         # Caso non gestito
         else:
             print(f"Estensione non gestita: {ext}")
             full_text = ""
-
 
         # Pulizia testo
         full_text = full_text.strip().replace("\x0c", "")
