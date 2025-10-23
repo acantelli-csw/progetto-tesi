@@ -1,6 +1,6 @@
 import numpy as np
 import json
-import db_connection
+import db_connection as db_connection
 
 # TODO: add new type of similarity searches
 

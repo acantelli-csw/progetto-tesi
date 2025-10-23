@@ -1,21 +1,26 @@
 from openai import AzureOpenAI
+from dotenv import load_dotenv
 import os
+
+load_dotenv(dotenv_path=".env")
 
 # Calcola gli embeddings per ogni documento a partire dal testo estratto
 def get_embedding(text):
 
-#
-#
-
-    # Inizializza la chiamata API di Azure OpenAI
+    # Configura client per chiamata API di Azure OpenAI
     client = AzureOpenAI(
-        api_key=os.getenv("AZURE_API_KEY"),
-        azure_endpoint=os.getenv("/api/v{version}/OpenAi/Embeddings"),
-        api_version=os.getenv("2023-05-15")
+        azure_endpoint = os.getenv("EMBEDDING_URL_1"),
+        api_key = os.getenv("OPENAI_API_KEY"),
+        api_version = os.getenv("EMBEDDING_VERSION_1")
     )
 
+    # Esegui chiamata embedding
     response = client.embeddings.create(
-        model="text-embedding-ada-002",
-        input=text
+        input = text,
+        model = os.getenv("EMBEDDING_MODEL_1")
     )
-    return response.data[0].embedding
+
+    # Estrai il vettore embedding
+    embedding_vector = response.data[0].embedding
+
+    return embedding_vector

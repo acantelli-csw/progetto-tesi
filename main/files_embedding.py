@@ -1,8 +1,8 @@
 import json
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from main.docs_embedding.extract_text import extract_text_from_varbinary
-import db_connection
-import embedding
+import db_connection as db_connection
+import main.chatbot.embedding as embedding
 
 # Elaborazione file - TESTO + IMMAGINI
 
