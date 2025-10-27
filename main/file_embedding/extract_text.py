@@ -1,24 +1,24 @@
 from PIL import Image
 from io import BytesIO
 from docx import Document
-import pytesseract
 import textract
-import pytesseract
+import easyocr
 import tempfile
 import os
 import fitz  
-
 
 # Estrai testo e immagini dai documenti in base all'estensione
 def extract_text_from_varbinary(file_bytes, extension):
 
     ext = extension.lower()
     full_text = ""
+    # Inizializza il reader OCR
+    reader = easyocr.Reader(['it', 'en'])
 
     try:
 
         # Caso 1: PDF (testo + OCR)
-        if ext == "pdf":
+        if ext == ".pdf":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(file_bytes)
                 tmp_path = tmp.name
@@ -38,7 +38,10 @@ def extract_text_from_varbinary(file_bytes, extension):
                         base_image = doc.extract_image(xref)
                         image_bytes = base_image["image"]
                         img = Image.open(BytesIO(image_bytes))
-                        ocr_text = pytesseract.image_to_string(img)
+                        
+                        result = reader.readtext(img)
+                        ocr_text = " ".join([res[1] for res in result])
+
                         if ocr_text.strip():
                             full_text += f"\n[OCR p.{page_index+1} img.{img_index+1}]: {ocr_text}\n"
 
@@ -46,7 +49,7 @@ def extract_text_from_varbinary(file_bytes, extension):
 
 
         # Caso 2: DOCX (testo + OCR immagini)
-        elif ext == "docx":
+        elif ext == ".docx":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
                 tmp.write(file_bytes)
                 tmp_path = tmp.name
@@ -61,14 +64,17 @@ def extract_text_from_varbinary(file_bytes, extension):
                 if "image" in rel.target_ref:
                     img_data = rel.target_part.blob
                     img = Image.open(BytesIO(img_data))
-                    ocr_text = pytesseract.image_to_string(img)
+    
+                    result = reader.readtext(img)
+                    ocr_text = " ".join([res[1] for res in result])
+
                     if ocr_text.strip():
                         full_text += f"\n[OCR immagine]: {ocr_text}\n"
 
             os.remove(tmp_path)
 
         # Caso 3: DOC (conversione + testo)
-        elif ext == "doc":
+        elif ext == ".doc":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".doc") as tmp:
                 tmp.write(file_bytes)
                 tmp_path = tmp.name

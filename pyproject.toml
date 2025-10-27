@@ -15,11 +15,11 @@ dependencies = [
     "pandas",
     "python-dotenv",
     "tqdm",
-    "pytesseract",
+    "easyocr",
     "pillow",
-    "docx",
+    "python-docx",
     "textract",
-    "fitz"
+    "PyMuPDF"
 ]
 
 [build-system]
