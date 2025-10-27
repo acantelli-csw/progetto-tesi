@@ -6,7 +6,7 @@ load_dotenv(dotenv_path=".env")
 
 def get_connection():
     conn_str = (
-        "DRIVER={SQL Server};"
+        "DRIVER={ODBC Driver 18 for SQL Server};"
         "SERVER=CSW-021;"                               # nome o IP del server
         "DATABASE=BPM;"                                 # nome del DB
         f"UID={os.getenv("DB_UID")};"                   # SQL login

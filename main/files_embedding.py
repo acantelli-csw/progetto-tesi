@@ -4,48 +4,69 @@ import extract_text
 import db_connection
 import embedding
 
-def process_files(chunk_size = 1000, chunk_overlap = 150):
+chunk_size = 1000, chunk_overlap = 150
 
-    # Ottieni la connessione al DB + estrazione file senza embedding
-    conn = db_connection.get_connection()
-    cursor = conn.cursor()
+# Ottieni la connessione al DB + estrazione file senza embedding
+conn = db_connection.get_connection()
+cursor = conn.cursor()
 
-    cursor.execute("SELECT id, filename, extension, filedata FROM Files WHERE embedding IS NULL")
-    rows = cursor.fetchall()
+# Query per ottenere i file da processare e le loro variabili associate
+query = """
+SELECT v.InstanceID,
+       MAX(CASE WHEN v.VariableName = 'cliente' THEN v.StringValue END) AS cliente,
+       MAX(CASE WHEN v.VariableName = 'numero' THEN v.StringValue END) AS numero,
+       MAX(CASE WHEN v.VariableName = 'titolo' THEN v.StringValue END) AS titolo,
+       MAX(CASE WHEN v.VariableName = 'autore' THEN v.StringValue END) AS autore,
+       MAX(f.FileData) AS FileData
+FROM VAR_RICSW v 
+JOIN DocumentFiles f
+    ON v.InstanceID = f.InstanceID
+WHERE v.InstanceID IN (
+      SELECT v2.InstanceID
+      FROM VAR_RICSW v2
+      WHERE v2.VariableName = 'ELABORATO'
+        AND v2.BooleanValue = 0
+  )
+GROUP BY v.InstanceID
+ORDER BY v.InstanceID;
+"""
 
-    # Elaborazione di ogni file
-    for row in rows:
-        file_id, filename, ext, blob = row
+cursor.execute(query)
 
-        # Estrazione testo + OCR immagini interne
-        text = extract_text.extract_text_from_varbinary(blob, ext)
-        if not text.strip():
-            print(f"Nessun testo estratto dal file: {filename}")
-            continue
+rows = cursor.fetchall()
 
-        # Suddivisione in chunk
-        splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        chunks = splitter.split_text(text)
+# Elaborazione di ogni file
+for row in rows:
 
-        # Calcolo embedding per ogni chunk
-        embeddings = [embedding.get_embedding(chunk) for chunk in chunks]
-        
-        
-        # TODO: non aggregare i chunk, ma salvarli in una tabella separata per retrieval + ranking
-        # Media dei chunk per avere un unico embedding per documento
-        avg_embedding = [sum(col)/len(col) for col in zip(*embeddings)]
+    # TODO fix importing and add extension detection
+    instance_id, cliente, numero, titolo, autore, file_data = row
+
+    # Estrazione testo + OCR immagini interne
+    text = extract_text.extract_text_from_varbinary(file_data, '.docx')
+    if not text.strip():
+        print(f"Nessun testo estratto dal file con InstanceID {instance_id}, salto il file.")
+        continue
 
 
-        # TODO: Invece di usare json.dumps, utilizzare il formato nativo di SQL Server per vettori (versione 2025+)
-        # Salvataggio embedding nel DB
-        cursor.execute(
-            "UPDATE Files SET embedding = ? WHERE id = ?",
-            (json.dumps(avg_embedding), file_id)
-        )
-        conn.commit()
+    # Suddivisione in chunk
+    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    chunks = splitter.split_text(text)
 
-        print(f"File processato: {filename}, {len(chunks)} chunk generati")
+    # Calcolo e salvataggio su DB degli embedding per ogni chunk
+    chunk_records = []
+    for i, chunk in enumerate(chunks):
+        emb = embedding.get_embedding(chunk)
+        chunk_records.append((file_id, i, chunk, emb))
 
-    cursor.close()
-    conn.close()
-    print("Tutti i file sono stati processati!")
+    # Salvataggio di tutti i chunk in un'unica query
+    cursor.executemany(
+        "INSERT INTO FileChunks (file_id, chunk_index, chunk_text, chunk_embedding) VALUES (?, ?, ?, ?)",
+        chunk_records
+    )
+
+    conn.commit()
+    print(f"File processato: {filename}, {len(chunks)} chunk generati")
+
+cursor.close()
+conn.close()
+print("Tutti i file sono stati processati!")
