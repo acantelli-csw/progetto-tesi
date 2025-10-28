@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-import mainllm
+import main.llm.main_llm as main_llm
 
 st.write("Benvenuto nel chatbot di BPM!\nPosso aiutarti nella ricerca di informazioni basandomi sulle RI già sviluppate in precedenza dai tuoi colleghi, facendoti risparmiare molto tempo ;)")
 
@@ -27,7 +27,7 @@ if prompt := st.chat_input("What is up?"):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
-        assistant_response = mainllm.llm_call(prompt)
+        assistant_response = main_llm.llm_call(prompt)
 
         # Simulate stream of response with milliseconds delay
         for chunk in assistant_response.split():

@@ -7,6 +7,7 @@ from file_embedding.db_connection import get_connection
 from file_embedding.embedding import get_embedding
 
 # TODO sposta similarity search sul DB SQL Server 25 - NON SONO RIUSCITO
+# TODO implement keywords search
 
 # Similarità coseno tra due vettori.
 def cosine_similarity(vec1, vec2):
