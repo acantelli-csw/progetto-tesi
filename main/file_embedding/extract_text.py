@@ -1,6 +1,9 @@
+import warnings
+warnings.filterwarnings("ignore", message=".*pin_memory.*")
 from PIL import Image
 from io import BytesIO
 from docx import Document
+import numpy as np
 import textract
 import easyocr
 import tempfile
@@ -8,19 +11,19 @@ import os
 import fitz  
 
 # Estrai testo e immagini dai documenti in base all'estensione
-def extract_text_from_varbinary(file_bytes, extension):
+def extract_text_from_varbinary(file_data, extension, numero):
 
     ext = extension.lower()
     full_text = ""
     # Inizializza il reader OCR
-    reader = easyocr.Reader(['it', 'en'])
+    reader = easyocr.Reader(['it', 'en'], gpu=False)
 
     try:
 
         # Caso 1: PDF (testo + OCR)
         if ext == ".pdf":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(file_bytes)
+                tmp.write(file_data)
                 tmp_path = tmp.name
 
             # --- Testo nativo ---
@@ -37,9 +40,11 @@ def extract_text_from_varbinary(file_bytes, extension):
                         xref = img[0]
                         base_image = doc.extract_image(xref)
                         image_bytes = base_image["image"]
+
                         img = Image.open(BytesIO(image_bytes))
-                        
-                        result = reader.readtext(img)
+                        img_np = np.array(img)
+                        result = reader.readtext(img_np)
+
                         ocr_text = " ".join([res[1] for res in result])
 
                         if ocr_text.strip():
@@ -51,7 +56,7 @@ def extract_text_from_varbinary(file_bytes, extension):
         # Caso 2: DOCX (testo + OCR immagini)
         elif ext == ".docx":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
-                tmp.write(file_bytes)
+                tmp.write(file_data)
                 tmp_path = tmp.name
 
             doc = Document(tmp_path)
@@ -63,9 +68,11 @@ def extract_text_from_varbinary(file_bytes, extension):
             for rel in doc.part.rels.values():
                 if "image" in rel.target_ref:
                     img_data = rel.target_part.blob
+
                     img = Image.open(BytesIO(img_data))
-    
-                    result = reader.readtext(img)
+                    img_np = np.array(img)
+                    result = reader.readtext(img_np)
+
                     ocr_text = " ".join([res[1] for res in result])
 
                     if ocr_text.strip():
@@ -76,7 +83,7 @@ def extract_text_from_varbinary(file_bytes, extension):
         # Caso 3: DOC (conversione + testo)
         elif ext == ".doc":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".doc") as tmp:
-                tmp.write(file_bytes)
+                tmp.write(file_data)
                 tmp_path = tmp.name
             try:
                 text = textract.process(tmp_path).decode("utf-8")
@@ -96,5 +103,5 @@ def extract_text_from_varbinary(file_bytes, extension):
         return full_text
 
     except Exception as e:
-        print(f"Errore elaborando file .{ext}: {e}")
+        print(f"Errore elaborando file {numero}{ext}: {e}")
         return ""

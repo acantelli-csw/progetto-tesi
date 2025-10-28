@@ -31,7 +31,7 @@ WHERE v.InstanceID IN (
         AND v2.BooleanValue = 0
   )
 GROUP BY v.InstanceID
-ORDER BY v.InstanceID;
+ORDER BY Numero;
 """
 
 cursor.execute(query)
@@ -44,9 +44,9 @@ for row in rows:
     instance_id, cliente, numero, titolo, autore, file_data, extension = row
 
     # Estrazione testo + OCR immagini interne
-    text = extract_text.extract_text_from_varbinary(file_data, extension)
+    text = extract_text.extract_text_from_varbinary(file_data, extension, numero)
     if not text.strip():
-        print(f"Nessun testo estratto dal file con InstanceID {instance_id}, salto il file.")
+        print(f"Nessun testo estratto dal file {numero}{extension}, salto il file.")
         continue
 
     # Suddivisione in chunk
@@ -69,7 +69,7 @@ for row in rows:
     )
 
     conn.commit()
-    print(f"File processato con IstanceID {instance_id}, {len(chunks)} chunk generati")
+    print(f"File processato: {numero}{extension},\t{len(chunks)} chunk generati\n{'-'*40}\n")
 
 cursor.close()
 conn.close()
