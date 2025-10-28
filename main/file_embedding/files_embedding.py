@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore", message=".*pin_memory.*")
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import extract_text
 import db_connection
@@ -31,7 +33,7 @@ WHERE v.InstanceID IN (
         AND v2.BooleanValue = 0
   )
 GROUP BY v.InstanceID
-ORDER BY Numero;
+ORDER BY v.InstanceID;
 """
 
 cursor.execute(query)
@@ -67,6 +69,8 @@ for row in rows:
         "VALUES (?, ?, ?, ?, ?, ?, CAST(CAST(? AS VARCHAR(MAX)) AS VECTOR(1536)))",
         chunk_records
     )
+
+    cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'elaborato' AND InstanceID = ?", (instance_id))
 
     conn.commit()
     print(f"File processato: {numero}{extension},\t{len(chunks)} chunk generati\n{'-'*40}\n")
