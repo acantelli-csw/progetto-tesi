@@ -19,7 +19,8 @@ dependencies = [
     "pillow",
     "python-docx",
     "textract",
-    "PyMuPDF"
+    "PyMuPDF",
+    "streamlit"
 ]
 
 [build-system]

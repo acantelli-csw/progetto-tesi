@@ -44,7 +44,9 @@ def semantic_search(prompt):
     top_n = 10
     top_docs = docs_sorted[:top_n]
 
+    output_lines = []
     for d in top_docs:
-        print(d["numero"],"- Chunk n°",d["progressivo"], "-> Similarità:", d["similarity"])
-
-    return top_docs
+        line = f"{d['numero']} - Chunk n°{d['progressivo']} -> Similarità: {d['similarity']}"
+        output_lines.append(line)
+        
+    return top_docs, output_lines
