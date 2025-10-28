@@ -1,4 +1,3 @@
-@ -1,68 +0,0 @@
 from utils.azure_openai import ask_openai_function_call
 from tools.semantic_search import semantic_search
 from tools.keyword_search import keyword_search
@@ -65,5 +64,3 @@ def main():
         print(response["content"])
 
 
-if __name__ == "__main__":
-    main()
