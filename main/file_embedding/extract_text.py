@@ -1,22 +1,19 @@
 import warnings
-warnings.filterwarnings("ignore", message=".*pin_memory.*")
 from PIL import Image
 from io import BytesIO
 from docx import Document
 import numpy as np
 import textract
-import easyocr
 import tempfile
 import os
 import fitz  
 
+
 # Estrai testo e immagini dai documenti in base all'estensione
-def extract_text_from_varbinary(file_data, extension, numero):
+def extract_text_from_varbinary(file_data, extension, numero, reader):
 
     ext = extension.lower()
     full_text = ""
-    # Inizializza il reader OCR
-    reader = easyocr.Reader(['it', 'en'], gpu=False)
 
     try:
 

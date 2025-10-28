@@ -1,14 +1,20 @@
-import warnings
-warnings.filterwarnings("ignore", message=".*pin_memory.*")
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import extract_text
 import db_connection
 import embedding
 import json
+import easyocr
 
-# TODO: tune these parameters
+# TODO: check if it works with PDF and old DOC (especially)
+# TODO: tune chunks parameters
+
+# Configura il text splitter per il chunking
 chunk_size = 1000
 chunk_overlap = 150
+splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+
+# Inizializza il reader OCR una volta sola
+reader = easyocr.Reader(['it', 'en'], gpu=False)
 
 # Ottieni la connessione al DB + estrazione file senza embedding
 conn = db_connection.get_connection()
@@ -46,13 +52,12 @@ for row in rows:
     instance_id, cliente, numero, titolo, autore, file_data, extension = row
 
     # Estrazione testo + OCR immagini interne
-    text = extract_text.extract_text_from_varbinary(file_data, extension, numero)
+    text = extract_text.extract_text_from_varbinary(file_data, extension, numero, reader)
     if not text.strip():
         print(f"Nessun testo estratto dal file {numero}{extension}, salto il file.")
         continue
 
     # Suddivisione in chunk
-    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     chunks = splitter.split_text(text)
 
     # Calcolo e salvataggio su DB degli embedding per ogni chunk
