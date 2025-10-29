@@ -6,7 +6,7 @@ from openai import AzureOpenAI
 import search
 
 
-# 0. CONFIGURAZIONE ==================================================
+# 0. CONFIGURAZIONE =====================================================
 
 # Carica variabili d'ambiente
 load_dotenv()
@@ -25,7 +25,7 @@ prompt_path = Path(__file__).parent / "prompt.txt"
 SYSTEM_PROMPT = prompt_path.read_text(encoding="utf-8")
 
 
-# 1. DECISIONE TOOLS ========================================
+# 1. DECISIONE TOOLS =====================================================
 # TODO: tune and add examples for better performance
 
 def decide_tools(prompt: str) -> dict:
@@ -63,6 +63,14 @@ def decide_tools(prompt: str) -> dict:
                 "use_semantic": False,
                 "use_keyword": True,
                 "reason": "Richiesta precisa su documenti specifici, meglio ricerca per keyword."
+            }
+        },
+        {
+            "prompt": "Implementazione mrp",
+            "decision": {
+                "use_semantic": True,
+                "use_keyword": True,
+                "reason": "Richiesta generica ma include termini specifici dei moduli."
             }
         },
         {
@@ -113,50 +121,92 @@ def decide_tools(prompt: str) -> dict:
     
     return decision
 
-# ========================================
-# 3. SELEZIONE DOCUMENTI
-# ========================================
 
-def select_documents(user_prompt, documents):
+# 2. SELEZIONE DOCUMENTI =====================================================
 
-    if not documents:
-        return []
+def select_documents(user_prompt: str, documents: list) -> dict:
+    
+    system_message = """
+    Sei un assistente decisionale incaricato di filtrare documenti estratti da
+    un sistema di ricerca. Devi identificare quali documenti sono effettivamente
+    utili per rispondere a una richiesta utente e quali no.
 
-    system_prompt = (
-        "Sei un assistente intelligente. Hai una lista di documenti o chunk di documenti estratti da un database. "
-        "Il tuo compito è selezionare solo i documenti coerenti e rilevanti rispetto alla domanda dell'utente."
-    )
+    Criteri:
+    - Il documento è rilevante se contiene informazioni utili per rispondere
+      al prompt dell'utente.
+    - Alcuni documenti potrebbero essere estratti solo perché moderatamente
+      coerenti, ma non aiutano concretamente nella risposta.
+    - Rispondi SEMPRE in formato JSON con gli indici dei documenti:
+      {
+          "relevant_docs": [indici dei documenti utili],
+          "irrelevant_docs": [indici dei documenti non utili],
+          "reason": "<breve spiegazione>"
+      }
+    """
 
-    user_content = (
-        f"Domanda utente: {user_prompt}\n\n"
-        "Documenti estratti:\n" +
-        "\n".join(f"{i+1}. {doc}" for i, doc in enumerate(documents)) +
-        "\n\nRestituisci solo i numeri dei documenti rilevanti in una lista JSON, ad esempio: [1, 3, 5]"
-    )
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_content}
+    examples = [
+        {
+            "prompt": "Come posso generare un report dei movimenti di magazzino?",
+            "documents": [
+                {"title": "Report vendite mensili", "content": "Contiene dati di vendita per cliente e prodotto."},
+                {"title": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto."},
+                {"title": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software."}
+            ],
+            "decision": {
+                "relevant_docs": [1, 2],
+                "irrelevant_docs": [0],
+                "reason": "Il secondo e terzo documento contengono informazioni direttamente utili al report richiesto."
+            }
+        },
+        {
+            "prompt": "Come posso modificare la fattura di un cliente?",
+            "documents": [
+                {"title": "Fatture clienti", "content": "Guida alla gestione fatture e modifica dati cliente."},
+                {"title": "Gestione magazzino", "content": "Movimenti di magazzino e scorte."}
+            ],
+            "decision": {
+                "relevant_docs": [0],
+                "irrelevant_docs": [1],
+                "reason": "Solo il primo documento riguarda la modifica delle fatture."
+            }
+        }
     ]
 
+    # Costruisco il few-shot text
+    few_shot_text = ""
+    for ex in examples:
+        docs_text = "\n".join([f"{i}: {d['title']} - {d['content']}" for i, d in enumerate(ex['documents'])])
+        few_shot_text += f"Prompt utente: {ex['prompt']}\nDocumenti:\n{docs_text}\nDecisione: {json.dumps(ex['decision'])}\n\n"
+
+    # Testo del prompt per il modello
+    docs_text = "\n".join([f"{i}: {d['title']} - {d['content']}" for i, d in enumerate(documents)])
+    user_message = f"{few_shot_text}Prompt utente: {user_prompt}\nDocumenti:\n{docs_text}\nDecisione:"
+
+    # Chiamata al modello
     response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=messages
+        model = MODEL_NAME,
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}
+        ],
+        temperature=0
     )
 
-    # Parsing della lista dei documenti rilevanti
+    decision_text = response.choices[0].message.content
+
+    # Parsing JSON con fallback
     try:
-        relevant_indices = json.loads(response.choices[0].message["content"])
-        filtered_docs = [documents[i-1] for i in relevant_indices if 0 < i <= len(documents)]
-        return filtered_docs
-    except Exception as e:
-        print("Errore nel parsing del filtro documenti:", e)
-        return documents  # fallback: restituisci tutti i documenti
+        decision = json.loads(decision_text)
+    except json.JSONDecodeError:
+        decision = {
+            "relevant_docs": [],
+            "irrelevant_docs": list(range(len(documents))),
+            "reason": f"Errore nel parsing della risposta: {decision_text}"
+        }
 
+    return decision
 
-# ========================================
-# 4. GENERAZIONE RISPOSTA FINALE
-# ========================================
+# 3. GENERAZIONE RISPOSTA FINALE =====================================================
 
 def generate_final_response(user_prompt, documents):
 
@@ -175,28 +225,34 @@ def generate_final_response(user_prompt, documents):
     return response.choices[0].message["content"]
 
 
-# ========================================
-# FLUSSO COMPLETO DEL CHATBOT
-# ========================================
+# FLUSSO COMPLETO DEL CHATBOT =====================================================
 
 def gpt_request(user_prompt):
+# TODO improve and use output_line from semantic search
 
-    # 1️. Decisione strumenti
+    # 1️ - Decisione strumenti
     tools = decide_tools(user_prompt)
-    print(tools)
-    
-    # 2️. Recupero documenti
-    if tools["use_semantic_search"]:
+    print("\nRagionamento sugli strumenti da usare:")
+    print(tools["reason"])
+
+    # 1.5 - Recupero documenti
+    if tools["use_semantic"]:
+        print("\nUso la ricerca SEMANTICA\n")
         documents, output_line = search.semantic_search(user_prompt)
-    # if tools["use_keyword_search"]:
+
+    if tools["use_keyword"]:
+        print("\nUso la ricerca per KEYWORDS (ancora da implementare)\n")
         # documents += search.keyword_search(user_prompt)
 
-    # 3. Selezione documenti in base alla coerenza
+    # FINO QUI TUTTO OK
+
+    # 2 - Selezione documenti in base alla coerenza
+    # TODO test this one
     best_documents = []
     if documents:
         best_documents = select_documents(user_prompt, documents)
 
-    # 4. Genera risposta finale
+    # 3 - Genera risposta finale
     final_response = generate_final_response(user_prompt, best_documents)
     return final_response
 

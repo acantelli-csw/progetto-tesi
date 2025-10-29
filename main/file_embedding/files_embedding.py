@@ -78,7 +78,7 @@ for row in rows:
     cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'elaborato' AND InstanceID = ?", (instance_id))
 
     conn.commit()
-    print(f"File processato: {numero}{extension},\t{len(chunks)} chunk generati\n{'-'*40}\n")
+    print(f"File processato: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40}\n")
 
 cursor.close()
 conn.close()

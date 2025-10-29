@@ -64,16 +64,20 @@ def extract_text_from_varbinary(file_data, extension, numero, reader):
             # --- OCR su immagini embedded ---
             for rel in doc.part.rels.values():
                 if "image" in rel.target_ref:
-                    img_data = rel.target_part.blob
+                    if not rel.target_mode == "External":
+                        img_data = rel.target_part.blob
 
-                    img = Image.open(BytesIO(img_data))
-                    img_np = np.array(img)
-                    result = reader.readtext(img_np)
+                        img = Image.open(BytesIO(img_data))
+                        img_np = np.array(img)
+                        result = reader.readtext(img_np)
 
-                    ocr_text = " ".join([res[1] for res in result])
+                        ocr_text = " ".join([res[1] for res in result])
 
-                    if ocr_text.strip():
-                        full_text += f"\n[OCR immagine]: {ocr_text}\n"
+                        if ocr_text.strip():
+                            full_text += f"\n[OCR immagine]: {ocr_text}\n"
+                    else: 
+                        print("Immagine con link esterno")
+                        #continue
 
             os.remove(tmp_path)
 
