@@ -6,7 +6,7 @@ import textract
 import tempfile
 import os
 import fitz  
-import requests
+
 
 # Estrai testo e immagini dai documenti in base all'estensione
 def extract_text_from_varbinary(file_data, extension, numero, reader):
@@ -65,36 +65,27 @@ def extract_text_from_varbinary(file_data, extension, numero, reader):
             for rel in doc.part.rels.values():
                 target_ref = getattr(rel, "target_ref", "")
                 target_part = getattr(rel, "target_part", None)
-                is_external = hasattr(rel, "is_external") and rel.is_external
 
                 # Se la relazione punta a un'immagine
                 if "image" in target_ref:
+                    # Check se è un link esterno
+                    is_external = hasattr(rel, "is_external") and rel.is_external
                     
-                    try:
-                        if not is_external and target_part is not None:
-                            # --- Caso immagine interna ---
-                            img_data = target_part.blob
-                        elif is_external and target_ref.startswith(("http://", "https://")):
-                            # --- Caso immagine esterna ---
-                            print(f"Scaricamento immagine esterna da: {target_ref}")
-                            resp = requests.get(target_ref, timeout=5)
-                            resp.raise_for_status()
-                            img_data = resp.content
-                        else:
-                            print(f"Immagine esterna non gestibile: {target_ref}")
-                            continue
+                    if is_external or target_part is None:
+                        print(f"Ignorata immagine con link esterno: {target_ref}")
+                        #continue  # salta immagine non incorporata
 
-                        # OCR
+                    try:
+                        img_data = target_part.blob
                         img = Image.open(BytesIO(img_data))
                         img_np = np.array(img)
                         result = reader.readtext(img_np)
                         ocr_text = " ".join([res[1] for res in result])
                         if ocr_text.strip():
-                            full_text += f"\n[OCR immagine]: {ocr_text}\n"
-
-                    except requests.RequestException as e:
-                        print(f"Errore scaricamento immagine esterna ({target_ref}): {e}")
-
+                            full_text += f"\n[OCR immagine embedded]: {ocr_text}\n"
+                    except Exception as e:
+                        print(f"Errore OCR immagine DOCX: {e}")
+                        
             os.remove(tmp_path)
 
         # Caso 3: DOC (conversione + testo)
