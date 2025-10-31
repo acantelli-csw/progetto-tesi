@@ -1,5 +1,5 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import extract_text_no_ext_link_handling
+import extract_text
 import db_connection
 import embedding
 import json
@@ -52,7 +52,7 @@ for row in rows:
     instance_id, cliente, numero, titolo, autore, file_data, extension = row
 
     # Estrazione testo + OCR immagini interne
-    text = extract_text_no_ext_link_handling.extract_text_from_varbinary(file_data, extension, numero, reader)
+    text = extract_text.extract_text_from_varbinary(file_data, extension, numero, reader)
     if not text.strip():
         print(f"Nessun testo estratto dal file {numero}{extension}, salto il file.")
         continue
