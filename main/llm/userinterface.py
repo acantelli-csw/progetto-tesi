@@ -2,24 +2,25 @@ import streamlit as st
 import time
 import main.llm.main_llm as main_llm
 
-st.write("Benvenuto nel chatbot di BPM!\nPosso aiutarti nella ricerca di informazioni basandomi sulle RI già sviluppate in precedenza dai tuoi colleghi, facendoti risparmiare molto tempo ;)")
+st.write("Benvenuto nel chatbot di BPM!")
+st.write("Posso aiutarti a trovare facilmente le informazioni che ti servono all’interno delle RI già sviluppate dai tuoi colleghi — così non dovrai ricominciare da zero!")
 
-st.caption("Controlla sempre i risultati ottenuti andando a controllare le RI utilizzat per generare la risposta, perché posso sbagliare anche io...")
+st.caption("Mi raccomando, verifica sempre i risultati ottenuti! Posso sbagliare anche io...")
+st.caption("Per farlo puoi controllare direttamente le RI utilizzate per generare la risposta e fornite con essa.")
 
-# Initialize chat history
+# Inizializza cronologia chat
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Di cosa hai bisogno? 👇"}]
+    st.session_state.messages = [{"role": "assistant", "content": "Come posso esserti utile? 👇"}]
 
-# Display chat messages from history on app rerun
+# Mostra messaggi precedenti al ri-caricamento
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# Accept user input
-if prompt := st.chat_input("What is up?"):
-    # Add user message to chat history
+# Input utente
+if prompt := st.chat_input("Come implementare un piano di consegna?"):
+    # Salva e mostra messaggio utente
     st.session_state.messages.append({"role": "user", "content": prompt})
-    # Display user message in chat message container
     with st.chat_message("user"):
         st.markdown(prompt)
 
