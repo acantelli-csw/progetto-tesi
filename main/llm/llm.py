@@ -1,8 +1,7 @@
-import json
-import os
-from pathlib import Path
 from dotenv import load_dotenv
 from openai import AzureOpenAI
+import json
+import os
 import search
 
 
@@ -19,10 +18,6 @@ client = AzureOpenAI(
 )
 
 MODEL_NAME = os.getenv("LLM_MODEL")
-
-# Lettura del system prompt da file
-prompt_path = Path(__file__).parent / "prompt.txt"
-SYSTEM_PROMPT = prompt_path.read_text(encoding="utf-8")
 
 
 # 1. DECISIONE TOOLS DA USARE =====================================================
@@ -121,6 +116,7 @@ def decide_tools(prompt: str) -> dict:
     
     return decision
 
+
 # 2. SELEZIONE DOCUMENTI =====================================================
 # TODO: add examples and tune the system prompt
 
@@ -208,20 +204,66 @@ def select_documents(user_prompt: str, documents: list) -> dict:
 
     return decision
 
+
 # 3. GENERAZIONE RISPOSTA FINALE =====================================================
 
-def generate_final_response(user_prompt, documents):
+def generate_final_answer(user_prompt: str, selected_docs: list) -> str:
 
-    context_text = "\n\n".join(documents) if documents else "Nessun documento rilevante trovato."
+    context_text = "\n\n".join([f" Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" for d in selected_docs]) if selected_docs else "Nessun documento rilevante trovato."
 
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"Domanda: {user_prompt}\n\nDocumenti:\n{context_text}"}
+    system_message = """
+    Sei un assistente esperto di un software gestionale. Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti. 
+    Regole:
+    1. Non inventare informazioni o dettagli che non sono nei documenti.
+    2. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
+    3. Alla fine della risposta, fornire la lista dei documenti di riferimento usati.
+    4. Mantieni la risposta chiara e strutturata, basata esclusivamente sui documenti forniti.
+    """
+
+    examples = [
+        {
+            "user_prompt": "Come configurare i piani di consegna e le chiavi univoche?",
+            "documents": [
+                {"titolo": "Configurazione piani di consegna", "content": "Per impostare i piani di consegna, definire importazione e gestione dei dati.", "autore": "Mario", "cliente": "Alfa"},
+                {"titolo": "Gestione chiavi univoche", "content": "Le chiavi univoche devono essere definite per ogni cliente per evitare conflitti.", "autore": "Luca", "cliente": "Beta"}
+            ],
+            "answer": "Per configurare i piani di consegna, impostare importazione e gestione dei dati [1]. Le chiavi univoche devono essere definite per ciascun cliente [2].\n\nDocumenti di riferimento:\n1. Titolo: Configurazione piani di consegna, Autore: Mario, Cliente: Alfa\n2. Titolo: Gestione chiavi univoche, Autore: Luca, Cliente: Beta"
+        },
+        {
+            "user_prompt": "Come verificare i dati importati nel sistema?",
+            "documents": [
+                {"titolo": "Controllo dati importati", "content": "Verificare che tutti i campi siano completi e corretti dopo l'importazione.", "autore": "Anna", "cliente": "Gamma"}
+            ],
+            "answer": "Per verificare i dati importati, controllare che tutti i campi siano completi e corretti [1].\n\nDocumenti di riferimento:\n1. Titolo: Controllo dati importati, Autore: Anna, Cliente: Gamma"
+        }
     ]
+
+        # Costruzione del testo degli esempi da dare al modello
+    
+    few_shot_text = ""
+    for ex in examples:
+        docs_text_example = "\n".join([f"{i+1}: Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" for i, d in enumerate(ex['documents'])
+        ])
+        few_shot_text += f"Prompt utente: {ex['user_prompt']}\nDocumenti:\n{docs_text_example}\nRisposta attesa:\n{ex['answer']}\n\n"
+
+    user_message = f"""
+    {few_shot_text}
+
+    Prompt utente: {user_prompt}
+
+    Documenti disponibili:
+    {context_text}
+
+    Risposta attesa:
+    """
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
-        messages=messages
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": user_message}
+        ],
+        temperature=0
     )
 
     return response.choices[0].message.content
@@ -240,23 +282,23 @@ def gpt_request(user_prompt):
     # 1.5 - Recupero documenti
     if tools["use_semantic"]:
         print("\nUso la ricerca SEMANTICA\n")
-        documents, output_line = search.semantic_search(user_prompt)
+        all_documents, output_line = search.semantic_search(user_prompt)
 
     if tools["use_keyword"]:
         print("\nUso la ricerca per KEYWORDS (ancora da implementare)\n")
-        # documents += search.keyword_search(user_prompt)
+        # all_documents += search.keyword_search(user_prompt)
 
     # 2 - Selezione documenti in base alla coerenza
-    best_documents = []
-    if documents:
-        best_documents = select_documents(user_prompt, documents)
+    document_selection = []
+    if all_documents:
+        document_selection = select_documents(user_prompt, all_documents)
 
-    print(len(best_documents))
-    print(best_documents)
+    # Selezione dei documenti rilevanti
+    selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
 
     # 3 - Genera risposta finale
-    final_response = generate_final_response(user_prompt, best_documents)
-    return final_response
+    final_answer = generate_final_answer(user_prompt, selected_docs)
+    return final_answer
 
 
 

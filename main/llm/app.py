@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-import main_llm
+import llm
 import ui 
 
 # TODO: add cronologia chat precedenti nella sidebar laterale
@@ -40,9 +40,9 @@ if prompt := st.chat_input("Come implementare un piano di consegna..."):
         st.markdown(prompt)
 
     # Display assistant response in chat message container
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar="📄"):
         full_response = ""
-        assistant_response = main_llm.call_llm(prompt)
+        assistant_response = llm.gpt_request(prompt)
 
         # Simulate stream of response with milliseconds delay
         message_placeholder = st.empty()
@@ -50,8 +50,10 @@ if prompt := st.chat_input("Come implementare un piano di consegna..."):
             full_response += chunk + " "
             time.sleep(0.05)
             # Add a blinking cursor to simulate typing
-            message_placeholder.markdown(full_response + "▌")
-        message_placeholder.markdown(full_response)
+            markdown_ready = full_response.replace("\n- ", "\n- ")
+            formatted_response = markdown_ready.replace("\n", "  \n")
+            message_placeholder.markdown(formatted_response + "▌")
+        message_placeholder.markdown(formatted_response)
 
     # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
+    st.session_state.messages.append({"role": "assistant", "content": formatted_response})
