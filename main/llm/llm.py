@@ -20,12 +20,12 @@ client = AzureOpenAI(
 
 MODEL_NAME = os.getenv("LLM_MODEL")
 
-# Lettura del systme prompt da file
+# Lettura del system prompt da file
 prompt_path = Path(__file__).parent / "prompt.txt"
 SYSTEM_PROMPT = prompt_path.read_text(encoding="utf-8")
 
 
-# 1. DECISIONE TOOLS =====================================================
+# 1. DECISIONE TOOLS DA USARE =====================================================
 # TODO: tune and add examples for better performance
 
 def decide_tools(prompt: str) -> dict:
@@ -121,15 +121,16 @@ def decide_tools(prompt: str) -> dict:
     
     return decision
 
-
 # 2. SELEZIONE DOCUMENTI =====================================================
+# TODO: add examples and tune the system prompt
 
 def select_documents(user_prompt: str, documents: list) -> dict:
     
     system_message = """
     Sei un assistente decisionale incaricato di filtrare documenti estratti da
-    un sistema di ricerca. Devi identificare quali documenti sono effettivamente
-    utili per rispondere a una richiesta utente e quali no.
+    un sistema di ricerca. Devi identificare quali, tra i documenti estratti, sono quelli 
+    strettamente utili per rispondere a una richiesta utente e 
+    coerenti con essa nello specifico e quali no.
 
     Criteri:
     - Il documento è rilevante se contiene informazioni utili per rispondere
@@ -148,9 +149,9 @@ def select_documents(user_prompt: str, documents: list) -> dict:
         {
             "prompt": "Come posso generare un report dei movimenti di magazzino?",
             "documents": [
-                {"title": "Report vendite mensili", "content": "Contiene dati di vendita per cliente e prodotto."},
-                {"title": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto."},
-                {"title": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software."}
+                {"titolo": "Report vendite mensili", "content": "Contiene dati di vendita per cliente e prodotto.", "autore": "Mario", "cliente": "ClienteA"},
+                {"titolo": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto.", "autore": "Luigi", "cliente": "ClienteB"},
+                {"titolo": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software.", "autore": "Anna", "cliente": "ClienteC"}
             ],
             "decision": {
                 "relevant_docs": [1, 2],
@@ -161,8 +162,8 @@ def select_documents(user_prompt: str, documents: list) -> dict:
         {
             "prompt": "Come posso modificare la fattura di un cliente?",
             "documents": [
-                {"title": "Fatture clienti", "content": "Guida alla gestione fatture e modifica dati cliente."},
-                {"title": "Gestione magazzino", "content": "Movimenti di magazzino e scorte."}
+                {"titolo": "Fatture clienti", "content": "Guida alla gestione fatture e modifica dati cliente.", "autore": "Andrea", "cliente": "ClienteD"},
+                {"titolo": "Gestione magazzino", "content": "Movimenti di magazzino e scorte.", "autore": "Riccardo", "cliente": "ClienteE"}
             ],
             "decision": {
                 "relevant_docs": [0],
@@ -172,14 +173,15 @@ def select_documents(user_prompt: str, documents: list) -> dict:
         }
     ]
 
+    
     # Costruisco il few-shot text
     few_shot_text = ""
     for ex in examples:
-        docs_text = "\n".join([f"{i}: {d['title']} - {d['content']}" for i, d in enumerate(ex['documents'])])
+        docs_text = "\n".join([f"{i}: {d['titolo']} - {d['content']} (autore: {d['autore']}, cliente: {d['cliente']})" for i, d in enumerate(ex['documents'])])
         few_shot_text += f"Prompt utente: {ex['prompt']}\nDocumenti:\n{docs_text}\nDecisione: {json.dumps(ex['decision'])}\n\n"
 
     # Testo del prompt per il modello
-    docs_text = "\n".join([f"{i}: {d['title']} - {d['content']}" for i, d in enumerate(documents)])
+    docs_text = "\n".join([f"{i}: {d['titolo']} - {d['content']} (autore: {d['autore']}, cliente: {d['cliente']})" for i, d in enumerate(documents)])
     user_message = f"{few_shot_text}Prompt utente: {user_prompt}\nDocumenti:\n{docs_text}\nDecisione:"
 
     # Chiamata al modello
@@ -222,13 +224,13 @@ def generate_final_response(user_prompt, documents):
         messages=messages
     )
 
-    return response.choices[0].message["content"]
+    return response.choices[0].message.content
 
 
 # FLUSSO COMPLETO DEL CHATBOT =====================================================
 
 def gpt_request(user_prompt):
-# TODO improve and use output_line from semantic search
+# TODO use output_line from semantic search (es. filtra quelli con similirità sotto la media)
 
     # 1️ - Decisione strumenti
     tools = decide_tools(user_prompt)
@@ -244,13 +246,13 @@ def gpt_request(user_prompt):
         print("\nUso la ricerca per KEYWORDS (ancora da implementare)\n")
         # documents += search.keyword_search(user_prompt)
 
-    # FINO QUI TUTTO OK
-
     # 2 - Selezione documenti in base alla coerenza
-    # TODO test this one
     best_documents = []
     if documents:
         best_documents = select_documents(user_prompt, documents)
+
+    print(len(best_documents))
+    print(best_documents)
 
     # 3 - Genera risposta finale
     final_response = generate_final_response(user_prompt, best_documents)
