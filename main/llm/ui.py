@@ -47,6 +47,8 @@ def apply_style():
     section[data-testid="stSidebar"] {
         background-color: #ffffff;
         border-right: 1px solid #dee2e6;
+        min-width: 325px;
+        max-width: 600px;
     }
 
     /* Hover su input base */  
@@ -56,6 +58,7 @@ def apply_style():
         box-shadow: 0 1px 4px rgba(0,0,0,0.1);
     }
 
+    /* Input nome utente */
     div[data-baseweb="input"] > div {
         background-color: #f8f9fa !important;
         border: 1.5px solid #dee2e6 !important;
@@ -64,11 +67,12 @@ def apply_style():
         padding: 0.4rem 0.8rem !important;
         transition: all 0.2s ease-in-out;
     }
-
+    
     /* Clear float dopo la chat */
     [data-testid="stVerticalBlock"] {
         overflow: auto;
     }
+ 
     </style>
     """, unsafe_allow_html=True)
 

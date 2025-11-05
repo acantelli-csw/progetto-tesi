@@ -29,50 +29,55 @@ with st.sidebar:
     # Se l'utente non è autenticato → mostra login/registrazione
     if not st.session_state.authenticated:
         action = st.radio("Seleziona azione:", ["Accedi", "Registrati"], horizontal=True)
+    
+        with st.form(key="auth_form", clear_on_submit=False):
+            username_input = st.text_input("👤 Nome utente", key="username_input", label_visibility="visible")
+            password_input = st.text_input("🔑 Password", key="password_input", label_visibility="visible")
+            submit = st.form_submit_button("Login" if action == "Accedi" else "Crea account")
 
-        username_input = st.text_input("👤 Nome utente:")
-        password_input = st.text_input("🔑 Password:", type="password")
+        if action == "Accedi" and submit:
+            if ui.authenticate_user(username_input, password_input):
+                st.session_state.authenticated = True
+                st.session_state.username = username_input
 
-        if action == "Accedi":
-            if st.button("Login"):
-                if ui.authenticate_user(username_input, password_input):
-                    st.session_state.authenticated = True
-                    st.session_state.username = username_input
-                    st.success(f"Benvenuto, {username_input}!")
-                    st.rerun()
-                else:
-                    st.error("Nome utente o password errati.")
+                # Carica subito la chat dell'utente
+                st.session_state.messages = ui.load_chat_history(username_input)
+                if not st.session_state.messages:
+                    st.session_state.messages = [{"role": "assistant", "content": "Come posso esserti utile? 👇"}]
 
-        elif action == "Registrati":
-            if st.button("Crea account"):
-                if not username_input or not password_input:
-                    st.warning("Inserisci sia username che password.")
-                elif ui.register_user(username_input, password_input):
-                    st.success("Registrazione completata! Ora puoi accedere.")
-                else:
-                    st.error("Questo nome utente esiste già.")
+                st.success(f"Benvenuto, **{username_input}** 👋")
+                st.rerun()
+            else:
+                st.error("Nome utente o password errati.")
+
+        elif action == "Registrati" and submit:
+            if not username_input or not password_input:
+                st.warning("Inserisci sia username che password.")
+            elif ui.register_user(username_input, password_input):
+                st.success("Registrazione completata! Ora puoi accedere.")
+            else:
+                st.error("Questo nome utente esiste già.")
         st.stop()  # blocca il resto dell'app finché non è autenticato
+
+    # Se autenticato → mostra opzioni utente
     else:
-        st.success(f"✅ Autenticato come **{st.session_state.username}**")
+        username = st.session_state.username
+        st.success(f"✅ Autenticato come **{username}**")
+
+        # Pulsante reset chat
+        if st.button("🔄 Resetta chat"):
+            ui.reset_chat_history(username)
+            st.session_state.messages = [{"role": "assistant", "content": "Chat resettata. Come posso aiutarti? 👇"}]
+            ui.save_chat_history(username, st.session_state.messages)
+            st.success("💬 Chat resettata con successo!")
+            st.rerun()
+
+        # Pulsante logout
         if st.button("🚪 Esci"):
             st.session_state.authenticated = False
             st.session_state.username = None
             st.session_state.messages = []
             st.rerun()
-
-
-    username = st.text_input("Inserisci il tuo nome utente:", key="username")
-    if not username:
-        st.warning("Inserisci un nome utente per iniziare a chattare e per recuperare la chat precedente.")
-        st.stop()
-
-    # Bottone per resettare la chat
-    if st.button("🔄 Resetta chat"):
-        ui.reset_chat_history(username)
-        st.session_state.messages = [{"role": "assistant", "content": "Chat resettata. Come posso aiutarti? 👇"}]
-        ui.save_chat_history(username, st.session_state.messages)
-        st.success("Chat resettata con successo!")
-        st.rerun()
 
 # Inizializza chat al primo avvio o recupera la cronolgia chat al refresh della pagina
 if "messages" not in st.session_state:

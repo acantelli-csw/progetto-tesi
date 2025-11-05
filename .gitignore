@@ -13,5 +13,6 @@ __pycache__/
 *.egg-info/
 uv.lock
 
-# User chat histories
+# User credentials and chat histories
 chat_history
+users.json
