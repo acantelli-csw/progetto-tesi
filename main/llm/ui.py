@@ -1,4 +1,6 @@
 import streamlit as st
+import json
+import os
 
 def apply_style():
     """Applica CSS personalizzato per look aziendale sobrio e chat destra/sinistra."""
@@ -60,3 +62,37 @@ def build_sidebar():
         st.markdown("### 📄 Assistente Documentale RI")
         st.markdown("Chatta con il motore RAG aziendale per ricerca delle RI")
         st.divider()
+
+        st.markdown("### 👤 Impostazioni Utente")
+        username = st.text_input("Inserisci il tuo nome utente:", key="username")
+        if not username:
+            st.warning("Inserisci un nome utente per iniziare la chat.")
+            st.stop()
+
+        # Bottone per resettare la chat
+        if st.button("🔄 Resetta chat"):
+            reset_chat_history(username)
+            st.session_state.messages = [{"role": "assistant", "content": "Chat resettata. Come posso aiutarti? 👇"}]
+            save_chat_history(username, st.session_state.messages)
+            st.success("Chat resettata con successo!")
+            st.rerun()
+
+def get_user_filename(username):
+    return f"chat_history\chat_history_{username}.json"
+
+def load_chat_history(username):
+    filename = get_user_filename(username)
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+def save_chat_history(username, messages):
+    filename = get_user_filename(username)
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(messages, f, ensure_ascii=False, indent=2)
+
+def reset_chat_history(username):
+    filename = get_user_filename(username)
+    if os.path.exists(filename):
+        os.remove(filename)

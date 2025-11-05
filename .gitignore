@@ -12,3 +12,6 @@ __pycache__/
 # Build / packaging
 *.egg-info/
 uv.lock
+
+# User chat histories
+chat_history.*
