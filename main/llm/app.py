@@ -13,14 +13,54 @@ st.set_page_config(page_title="Assistente Documentale RI", page_icon="📄", lay
 # Applica stile personalizzato
 ui.apply_style()
 
-# Costruisci barra laterale
+# Costruisci barra laterale per accesso utente
 with st.sidebar:
     st.image("https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", width=120)
     st.markdown("### 📄 Assistente Documentale RI")
-    st.markdown("Chatta con il motore RAG aziendale per ricerca delle RI")
+    st.markdown("Accedi al tuo account e chatta con il motore RAG aziendale per ricerca delle RI")
     st.divider()
 
-    st.markdown("### 👤 Impostazioni Utente")
+    st.markdown("### 🔐 Accesso Utente")
+
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
+        st.session_state.username = None
+
+    # Se l'utente non è autenticato → mostra login/registrazione
+    if not st.session_state.authenticated:
+        action = st.radio("Seleziona azione:", ["Accedi", "Registrati"], horizontal=True)
+
+        username_input = st.text_input("👤 Nome utente:")
+        password_input = st.text_input("🔑 Password:", type="password")
+
+        if action == "Accedi":
+            if st.button("Login"):
+                if ui.authenticate_user(username_input, password_input):
+                    st.session_state.authenticated = True
+                    st.session_state.username = username_input
+                    st.success(f"Benvenuto, {username_input}!")
+                    st.rerun()
+                else:
+                    st.error("Nome utente o password errati.")
+
+        elif action == "Registrati":
+            if st.button("Crea account"):
+                if not username_input or not password_input:
+                    st.warning("Inserisci sia username che password.")
+                elif ui.register_user(username_input, password_input):
+                    st.success("Registrazione completata! Ora puoi accedere.")
+                else:
+                    st.error("Questo nome utente esiste già.")
+        st.stop()  # blocca il resto dell'app finché non è autenticato
+    else:
+        st.success(f"✅ Autenticato come **{st.session_state.username}**")
+        if st.button("🚪 Esci"):
+            st.session_state.authenticated = False
+            st.session_state.username = None
+            st.session_state.messages = []
+            st.rerun()
+
+
     username = st.text_input("Inserisci il tuo nome utente:", key="username")
     if not username:
         st.warning("Inserisci un nome utente per iniziare a chattare e per recuperare la chat precedente.")

@@ -1,6 +1,14 @@
 [
   {
     "role": "assistant",
-    "content": "Chat resettata. Come posso aiutarti? 👇"
+    "content": "Come posso esserti utile? 👇"
+  },
+  {
+    "role": "user",
+    "content": "prova"
+  },
+  {
+    "role": "assistant",
+    "content": "Risposta di prova al prompt: prova "
   }
 ]
