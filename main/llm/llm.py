@@ -280,6 +280,7 @@ def gpt_request(user_prompt):
     print(tools["reason"])
 
     # 1.5 - Recupero documenti
+    all_documents = []
     if tools["use_semantic"]:
         print("\nUso la ricerca SEMANTICA\n")
         all_documents, output_line = search.semantic_search(user_prompt)
@@ -290,14 +291,18 @@ def gpt_request(user_prompt):
 
     # 2 - Selezione documenti in base alla coerenza
     document_selection = []
-    if all_documents:
-        document_selection = select_documents(user_prompt, all_documents)
+    selected_docs = []
+    if tools["use_semantic"] or tools["use_keyword"]:
+        if all_documents:
+            document_selection = select_documents(user_prompt, all_documents)
 
-    # Selezione dei documenti rilevanti
-    selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
+            # Selezione documenti rilevanti
+            selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
 
     # 3 - Genera risposta finale
     final_answer = generate_final_answer(user_prompt, selected_docs)
+    print(type(final_answer))
+    print(repr(final_answer))
     return final_answer
 
 

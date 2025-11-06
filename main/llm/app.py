@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+import re
 import ui
 import llm
 import prova_llm
@@ -110,19 +111,25 @@ if prompt := st.chat_input("Come implementare un piano di consegna..."):
         full_response = ""
 
         with st.spinner(" Sto elaborando la risposta..."):
-            assistant_response = prova_llm.prova_chatbot(prompt)
-            # assistant_response = llm.gpt_request(prompt)
+            # assistant_response = prova_llm.prova_chatbot(prompt)
+            assistant_response = llm.gpt_request(prompt)
 
         # Simulate stream of response with milliseconds delay
         message_placeholder = st.empty()
         for chunk in assistant_response.split():
             full_response += chunk + " "
-            time.sleep(0.05)
+            time.sleep(0.03)
+
+            # Pulizia e formattazione per Markdown
+            formatted_response = full_response
+            formatted_response = formatted_response.replace("\n", "  \n")
+            formatted_response = re.sub(r"(?<!\n)\s*([-*]|\d+\.) ", r"\n\1 ", formatted_response)
+
             # Add a blinking cursor to simulate typing
-            markdown_ready = full_response.replace("\n- ", "\n- ")
-            formatted_response = markdown_ready.replace("\n", "  \n")
-            message_placeholder.markdown(formatted_response + "▌")
-        message_placeholder.markdown(formatted_response)
+            message_placeholder.markdown(formatted_response + "▌", unsafe_allow_html=True)
+        
+        formatted_response = re.sub(r"(?<!\n)\s*([-*]|\d+\.) ", r"\n\1 ", full_response.replace("\n", "  \n"))
+        message_placeholder.markdown(formatted_response, unsafe_allow_html=True)
 
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": formatted_response})
