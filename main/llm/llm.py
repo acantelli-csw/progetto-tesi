@@ -301,8 +301,6 @@ def gpt_request(user_prompt):
 
     # 3 - Genera risposta finale
     final_answer = generate_final_answer(user_prompt, selected_docs)
-    print(type(final_answer))
-    print(repr(final_answer))
     return final_answer
 
 
