@@ -207,7 +207,7 @@ def select_documents(user_prompt: str, documents: list) -> dict:
 
 # 3. GENERAZIONE RISPOSTA FINALE =====================================================
 
-def generate_final_answer(user_prompt: str, selected_docs: list) -> str:
+def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: list = None) -> str:
 
     context_text = "\n\n".join([f" Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" for d in selected_docs]) if selected_docs else "Nessun documento rilevante trovato."
 
@@ -218,6 +218,7 @@ def generate_final_answer(user_prompt: str, selected_docs: list) -> str:
     2. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
     3. Alla fine della risposta, fornire la lista dei documenti di riferimento usati.
     4. Mantieni la risposta chiara e strutturata, basata esclusivamente sui documenti forniti.
+    5. Se non vengono forniti documenti rispondi in modo naturale e umano, come se fossi un chatbot.
     """
 
     examples = [
@@ -249,13 +250,24 @@ def generate_final_answer(user_prompt: str, selected_docs: list) -> str:
     user_message = f"""
     {few_shot_text}
 
-    Prompt utente: {user_prompt}
+    Contesto conversazionale recente:
+    {chat_history}
+
+    Prompt utente:
+    {user_prompt}
 
     Documenti disponibili:
     {context_text}
 
     Risposta attesa:
     """
+
+    # Riassunto della chat precedente per dare contesto
+    history_text = ""
+    if chat_history:
+        for m in chat_history[-5:]:  # ultimi 5 messaggi per non esagerare coi token
+            role = "Utente" if m["role"] == "user" else "Assistente"
+            history_text += f"{role}: {m['content']}\n"
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -271,8 +283,11 @@ def generate_final_answer(user_prompt: str, selected_docs: list) -> str:
 
 # FLUSSO COMPLETO DEL CHATBOT =====================================================
 
-def gpt_request(user_prompt):
+def gpt_request(messages):
 # TODO use output_line from semantic search (es. filtra quelli con similirità sotto la media)
+
+    # Estrae l'ultimo prompt inserito dalla cronologia chat
+    user_prompt = [m["content"] for m in messages if m["role"] == "user"][-1]
 
     # 1️ - Decisione strumenti
     tools = decide_tools(user_prompt)
@@ -300,7 +315,9 @@ def gpt_request(user_prompt):
             selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
 
     # 3 - Genera risposta finale
-    final_answer = generate_final_answer(user_prompt, selected_docs)
+    final_answer = generate_final_answer(user_prompt, selected_docs, messages)
+    print(type(final_answer))
+    print(repr(final_answer))
     return final_answer
 
 

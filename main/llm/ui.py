@@ -47,8 +47,29 @@ def apply_style():
     section[data-testid="stSidebar"] {
         background-color: #ffffff;
         border-right: 1px solid #dee2e6;
-        min-width: 325px;
+        min-width: 0px;
         max-width: 600px;
+        visibility: visible !important;
+        transform: none !important;
+        }
+    }
+    
+    .top-bar {
+        background-color: #f5f5f5;
+        padding: 0.6rem 1rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .title {
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    .expander-container {
+        width: 250px;
     }
 
     /* Hover su input base */  

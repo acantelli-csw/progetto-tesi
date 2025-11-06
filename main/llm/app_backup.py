@@ -9,7 +9,7 @@ import prova_llm
 # TODO: deciedere logo o icone da mettere (es. logo CSW/BPM/Costum) al psoto dell'emoji
 
 # Configurazine base
-st.set_page_config(page_title="Assistente Documentale RI", page_icon="📄", layout="centered")
+st.set_page_config(page_title="Assistente Documentale RI", page_icon="📄", layout="wide")
 # Applica stile personalizzato
 ui.apply_style()
 
@@ -83,9 +83,7 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = ui.load_chat_history(username)
     if not st.session_state.messages:
-        st.session_state.messages = [
-            {"role": "system", "content": "Sei un assistente documentale esperto del software gestionale BPM. Rispondi in modo chiaro e basandoti solo sui documenti o sulle informazioni già fornite."},
-            {"role": "assistant", "content": "Come posso esserti utile? 👇"}]
+        st.session_state.messages = [{"role": "assistant", "content": "Come posso esserti utile? 👇"}]
 
 # Testata principale
 st.markdown("<h2 style='text-align:center;'>📄 Assistente Documentale RI</h2>", unsafe_allow_html=True)
@@ -113,7 +111,7 @@ if prompt := st.chat_input("Come implementare un piano di consegna..."):
 
         with st.spinner(" Sto elaborando la risposta..."):
             # assistant_response = prova_llm.prova_chatbot(prompt)
-            assistant_response = llm.gpt_request(st.session_state)
+            assistant_response = llm.gpt_request(prompt)
 
         # Simulate stream of response with milliseconds delay
         message_placeholder = st.empty()
