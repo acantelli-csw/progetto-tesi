@@ -5,9 +5,6 @@ import embedding
 import json
 import easyocr
 
-# TODO: check if it works with PDF and old DOC (especially)
-# TODO: tune chunks parameters
-
 # Configura il text splitter per il chunking
 chunk_size = 1000
 chunk_overlap = 150

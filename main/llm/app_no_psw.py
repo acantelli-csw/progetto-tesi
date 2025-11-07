@@ -2,10 +2,6 @@ import streamlit as st
 import time
 import ui
 import llm
-import prova_llm
-
-# TODO: add cronologia chat precedenti nella sidebar laterale
-# TODO: deciedere logo o icone da mettere (es. logo CSW/BPM/Costum) al psoto dell'emoji
 
 # Configurazine base
 st.set_page_config(page_title="Assistente Documentale RI", page_icon="📄", layout="wide")
@@ -68,9 +64,8 @@ if prompt := st.chat_input("Come implementare un piano di consegna..."):
         full_response = ""
 
         with st.spinner(" Sto elaborando la risposta..."):
-            assistant_response = prova_llm.prova_chatbot(prompt)
-            # assistant_response = llm.gpt_request(prompt)
-
+            assistant_response = llm.gpt_request(st.session_state.messages)
+            
         # Simulate stream of response with milliseconds delay
         message_placeholder = st.empty()
         for chunk in assistant_response.split():

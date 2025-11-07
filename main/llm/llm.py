@@ -21,7 +21,6 @@ MODEL_NAME = os.getenv("LLM_MODEL")
 
 
 # 1. DECISIONE TOOLS DA USARE =====================================================
-# TODO: tune and add examples for better performance
 
 def decide_tools(prompt: str) -> dict:
 
@@ -118,7 +117,6 @@ def decide_tools(prompt: str) -> dict:
 
 
 # 2. SELEZIONE DOCUMENTI =====================================================
-# TODO: add examples and tune the system prompt
 
 def select_documents(user_prompt: str, documents: list) -> dict:
     
@@ -290,7 +288,6 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
 # FLUSSO COMPLETO DEL CHATBOT =====================================================
 
 def gpt_request(messages):
-# TODO use output_line from semantic search (es. filtra quelli con similirità sotto la media)
 
     # Estrae l'ultimo prompt inserito dalla cronologia chat
     user_prompt = [m["content"] for m in messages if m["role"] == "user"][-1]

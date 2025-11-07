@@ -2,10 +2,6 @@ import streamlit as st
 import time
 import ui
 import llm
-import prova_llm
-
-# TODO: add cronologia chat precedenti nella sidebar laterale
-# TODO: deciedere logo o icone da mettere (es. logo CSW/BPM/Costum) al psoto dell'emoji
 
 # Configurazine base
 st.set_page_config(page_title="Assistente Documentale RI", page_icon="https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", layout="centered")
