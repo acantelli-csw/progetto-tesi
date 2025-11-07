@@ -3,7 +3,7 @@ from openai import AzureOpenAI
 import json
 import os
 import search
-
+import tiktoken
 
 # 0. CONFIGURAZIONE =====================================================
 
@@ -209,7 +209,9 @@ def select_documents(user_prompt: str, documents: list) -> dict:
 
 def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: list = None) -> str:
 
-    context_text = "\n\n".join([f" Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" for d in selected_docs]) if selected_docs else "Nessun documento rilevante trovato."
+    context_text = "\n\n".join([
+        f" Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" 
+        for d in selected_docs]) if selected_docs else "Nessun documento rilevante trovato."
 
     system_message = """
     Sei un assistente esperto di un software gestionale. Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti. 
@@ -248,11 +250,13 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
         ])
         few_shot_text += f"Prompt utente: {ex['user_prompt']}\nDocumenti:\n{docs_text_example}\nRisposta attesa:\n{ex['answer']}\n\n"
 
+    summarized_chat = summarize_chat_history(chat_history)
+
     user_message = f"""
     {few_shot_text}
 
     Contesto conversazionale recente:
-    {chat_history}
+    {summarized_chat}
 
     Prompt utente:
     {user_prompt}
@@ -263,12 +267,13 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
     Risposta attesa:
     """
 
-    # Riassunto della chat precedente per dare contesto
-    history_text = ""
-    if chat_history:
-        for m in chat_history[-5:]:  # ultimi 5 messaggi per non esagerare coi token
-            role = "Utente" if m["role"] == "user" else "Assistente"
-            history_text += f"{role}: {m['content']}\n"
+    """    # Riassunto della chat precedente per dare contesto
+        history_text = ""
+        if chat_history:
+            for m in chat_history[-5:]:  # ultimi 5 messaggi per non esagerare coi token
+                role = "Utente" if m["role"] == "user" else "Assistente"
+                history_text += f"{role}: {m['content']}\n
+    """
 
     response = client.chat.completions.create(
         model=MODEL_NAME,
@@ -317,9 +322,77 @@ def gpt_request(messages):
 
     # 3 - Genera risposta finale
     final_answer = generate_final_answer(user_prompt, selected_docs, messages)
-    print(type(final_answer))
-    print(repr(final_answer))
+
     return final_answer
 
 
+# GESTIONE LUNGHEZZA CRONOLOGIA MESSAGGI =====================================================
+def summarize_chat_history(chat_history, model_name=MODEL_NAME):
 
+    if not chat_history:
+        return ""
+    
+    encoding = tiktoken.encoding_for_model(model_name)
+    max_tokens=3000
+    reserved_tokens_for_summary = 500
+    allowed_recent_tokens = max_tokens - reserved_tokens_for_summary
+
+    # Se la chat è più corta del limite, restituisci tutta la chat senza ulteriori elaborazioni
+    total_chat_tokens = sum(len(encoding.encode(f"{'Utente' if m['role']=='user' else 'Assistente'}: {m['content']}\n")) for m in chat_history)
+
+    if total_chat_tokens <= max_tokens:
+        return "".join(f"{'Utente' if m['role']=='user' else 'Assistente'}: {m['content']}\n" for m in chat_history)
+    
+    recent_lines = []
+    recent_tokens = 0
+
+    # Salvo messaggi più recenti
+    for m in reversed(chat_history):
+        role = "Utente" if m["role"] == "user" else "Assistente"
+        line = f"{role}: {m['content']}\n"
+        line_tokens = len(encoding.encode(line))
+        if recent_tokens + line_tokens <= allowed_recent_tokens:
+            recent_lines.insert(0, line)  # inserisci in cima per mantenere ordine cronologico
+            recent_tokens += line_tokens
+        else:
+            break  # limite superato
+ 
+    # Riassumo messaggi vecchi
+    old_messages = chat_history[:len(chat_history) - len(recent_lines)]
+    summary_text = ""
+    if old_messages:
+        summary = summarize_old_messages(old_messages, reserved_tokens_for_summary)
+        summary_text = f"Riassunto messaggi precedenti: {summary}\n"
+
+    return summary_text + "".join(recent_lines)
+
+# RIASSUNTO MESSAGGI VECCHI
+def summarize_old_messages(messages, max_tokens):
+
+    model_name=MODEL_NAME
+
+    if not messages:
+        return ""
+    
+    system_prompt = """Sei un assistente che deve riassumere i messaggi precedenti della chat
+                        in modo sintetico, mantenendo solo i concetti principali.
+                        Il riassunto deve essere chiaro, breve e utile al contesto"""
+
+    # Costruisci il testo
+    text_to_summarize = ""
+    for m in messages:
+        role = "Utente" if m["role"] == "user" else "Assistente"
+        text_to_summarize += f"{role}: {m['content']}\n"
+    
+    # Chimata LLM per riassunto
+    response = client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text_to_summarize}
+        ],
+        temperature=0,
+        max_tokens=max_tokens
+    )
+
+    return response.choices[0].message.content

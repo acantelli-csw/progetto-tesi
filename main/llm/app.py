@@ -28,7 +28,7 @@ if st.session_state.sidebar_open:
         """
         <style>
             [data-testid="stSidebar"] {
-                min-width: 0rem !important;
+                min-width: 25rem !important;
                 max-width: 42rem !important;
                 transition: all 0.3s ease;
             }
