@@ -48,7 +48,7 @@ def apply_style():
         background-color: #ffffff;
         border-right: 1px solid #dee2e6;
         min-width: 0px;
-        max-width: 600px;
+        max-width: 700px;
         visibility: visible !important;
         transform: none !important;
         }
@@ -96,6 +96,16 @@ def apply_style():
  
     </style>
     """, unsafe_allow_html=True)
+
+def load_testata():
+    st.markdown("<h1 style='text-align:center;'>📄 Assistente Documentale RI</h1>", unsafe_allow_html=True)
+    st.write("Benvenuto nel chatbot di BPM per la ricerca RAG delle RI!")
+    st.write("Posso aiutarti a trovare facilmente le informazioni che ti servono all'interno delle RI già sviluppate dai tuoi colleghi — così non dovrai ricominciare da zero!")
+
+    st.caption("Mi raccomando, verifica sempre i risultati ottenuti! Posso sbagliare anche io...")
+    st.caption("Per farlo puoi controllare direttamente le RI utilizzate per generare la risposta e fornite con essa.")
+    st.divider()
+
 
 def get_user_filename(username):
     return f"chat_history/chat_history_{username}.json"

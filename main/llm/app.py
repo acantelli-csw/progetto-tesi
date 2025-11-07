@@ -1,6 +1,5 @@
 import streamlit as st
 import time
-import re
 import ui
 import llm
 import prova_llm
@@ -9,16 +8,58 @@ import prova_llm
 # TODO: deciedere logo o icone da mettere (es. logo CSW/BPM/Costum) al psoto dell'emoji
 
 # Configurazine base
-st.set_page_config(page_title="Assistente Documentale RI", page_icon="📄", layout="centered")
-# Applica stile personalizzato
+st.set_page_config(page_title="Assistente Documentale RI", page_icon="https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", layout="centered")
+
+# Applica stile
 ui.apply_style()
+
+# Inizializza stato sidebar
+if "sidebar_open" not in st.session_state:
+    st.session_state.sidebar_open = True
+
+# Toggle apertura/chiusura
+top_col1, top_col2 = st.columns([1, 4])
+with top_col1:
+    if st.button("☰"):
+        st.session_state.sidebar_open = not st.session_state.sidebar_open
+
+if st.session_state.sidebar_open:
+    st.markdown(
+        """
+        <style>
+            [data-testid="stSidebar"] {
+                min-width: 0rem !important;
+                max-width: 42rem !important;
+                transition: all 0.3s ease;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+else:
+    st.markdown(
+        """
+        <style>
+            [data-testid="stSidebar"] {
+                width: 0 !important;
+                min-width: 0 !important;
+                max-width: 0 !important;
+                overflow: hidden !important;
+                transition: all 0.3s ease;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
 # Costruisci barra laterale per accesso utente
 with st.sidebar:
-    st.image("https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", width=120)
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.image("https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", width=225)
     st.markdown("### 📄 Assistente Documentale RI")
-    st.markdown("Accedi al tuo account e chatta con il motore RAG aziendale per ricerca delle RI")
-    st.divider()
+    st.markdown("Accedi al tuo account e inizia a chattare con l'Assistente Documentale per ricerca RAG delle RI")
+    st.markdown("---")
 
     st.markdown("### 🔐 Accesso Utente")
 
@@ -79,7 +120,7 @@ with st.sidebar:
             st.session_state.messages = []
             st.rerun()
 
-# Inizializza chat al primo avvio o recupera la cronolgia chat al refresh della pagina
+# Inizializza chat al primo avvio o recupera la cronologia chat al refresh della pagina
 if "messages" not in st.session_state:
     st.session_state.messages = ui.load_chat_history(username)
     if not st.session_state.messages:
@@ -87,13 +128,8 @@ if "messages" not in st.session_state:
             {"role": "system", "content": "Sei un assistente documentale esperto del software gestionale BPM. Rispondi in modo chiaro e basandoti solo sui documenti o sulle informazioni già fornite."},
             {"role": "assistant", "content": "Come posso esserti utile? 👇"}]
 
-# Testata principale
-st.markdown("<h2 style='text-align:center;'>📄 Assistente Documentale RI</h2>", unsafe_allow_html=True)
-st.write("Benvenuto nel chatbot di BPM per la ricerca RAG delle RI!")
-st.write("Posso aiutarti a trovare facilmente le informazioni che ti servono all'interno delle RI già sviluppate dai tuoi colleghi — così non dovrai ricominciare da zero!")
-
-st.caption("Mi raccomando, verifica sempre i risultati ottenuti! Posso sbagliare anche io... \t Per farlo puoi controllare direttamente le RI utilizzate per generare la risposta e fornite con essa.")
-st.divider()
+# Testata principale chat
+ui.load_testata()
 
 # Mostra la cronologia messaggi della chat al ri-caricamento
 for message in st.session_state.messages:
@@ -101,37 +137,28 @@ for message in st.session_state.messages:
         st.markdown(message["content"])
 
 # Input utente
-if prompt := st.chat_input("Come implementare un piano di consegna..."):
+if prompt := st.chat_input("Scrivi qui..."):
     # Salva e mostra messaggio utente
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"): 
         st.markdown(prompt)
 
-    # Display assistant response in chat message container
+    # Mostra la risposta dell'assistente in chat
     with st.chat_message("assistant", avatar="📄"):
         full_response = ""
 
         with st.spinner(" Sto elaborando la risposta..."):
-            # assistant_response = prova_llm.prova_chatbot(prompt)
-            assistant_response = llm.gpt_request(st.session_state)
+            assistant_response = llm.gpt_request(st.session_state.messages)
 
-        # Simulate stream of response with milliseconds delay
+        # Simula risposta stream tramite un piccolo delay e un cursore
         message_placeholder = st.empty()
-        for chunk in assistant_response.split():
-            full_response += chunk + " "
-            time.sleep(0.03)
-
-            # Pulizia e formattazione per Markdown
-            formatted_response = full_response
-            formatted_response = formatted_response.replace("\n", "  \n")
-            formatted_response = re.sub(r"(?<!\n)\s*([-*]|\d+\.) ", r"\n\1 ", formatted_response)
-
-            # Add a blinking cursor to simulate typing
-            message_placeholder.markdown(formatted_response + "▌", unsafe_allow_html=True)
+        for char in assistant_response:
+            full_response += char
+            message_placeholder.markdown(full_response + "▌", unsafe_allow_html=True)
+            time.sleep(0.02)
         
-        formatted_response = re.sub(r"(?<!\n)\s*([-*]|\d+\.) ", r"\n\1 ", full_response.replace("\n", "  \n"))
-        message_placeholder.markdown(formatted_response, unsafe_allow_html=True)
+        message_placeholder.markdown(full_response, unsafe_allow_html=True)
 
-    # Add assistant response to chat history
-    st.session_state.messages.append({"role": "assistant", "content": formatted_response})
+    # Aggiungi la risposta dell'assistente alla cronologia chat
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
     ui.save_chat_history(username, st.session_state.messages)

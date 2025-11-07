@@ -219,6 +219,7 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
     3. Alla fine della risposta, fornire la lista dei documenti di riferimento usati.
     4. Mantieni la risposta chiara e strutturata, basata esclusivamente sui documenti forniti.
     5. Se non vengono forniti documenti rispondi in modo naturale e umano, come se fossi un chatbot.
+    6. In ogni caso, genera l'oupput in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
     """
 
     examples = [
