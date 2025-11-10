@@ -125,6 +125,11 @@ def select_documents(user_prompt: str, documents: list) -> dict:
     un sistema di ricerca. Devi identificare quali, tra i documenti estratti, sono quelli 
     strettamente utili per rispondere a una richiesta utente e 
     coerenti con essa nello specifico e quali no.
+    Questo perchè la ricerca documentale fornisce sempre i top 10 documenti più rilevanti 
+    ma non è detto che siano sempre tutti effettivamente utili. Per ciascun documento viene fornito, 
+    oltre al contenuto, anche il valore di similarità coseno del suo embedding con quello del 
+    prompt utente. Puoi sfruttare anche queste informazioni per filtrare i documenti 
+    (ad esempio per valori notevolmente più bassi degli altri).
 
     Criteri:
     - Il documento è rilevante se contiene informazioni utili per rispondere
@@ -143,9 +148,48 @@ def select_documents(user_prompt: str, documents: list) -> dict:
         {
             "prompt": "Come posso generare un report dei movimenti di magazzino?",
             "documents": [
-                {"titolo": "Report vendite mensili", "content": "Contiene dati di vendita per cliente e prodotto.", "autore": "Mario", "cliente": "ClienteA"},
-                {"titolo": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto.", "autore": "Luigi", "cliente": "ClienteB"},
-                {"titolo": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software.", "autore": "Anna", "cliente": "ClienteC"}
+                {"titolo": "Report vendite mensili", "content": "Contiene dati di vendita per cliente e prodotto.", "autore": "Mario", "cliente": "ClienteA", "similarity": 0.42},
+                {"titolo": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto.", "autore": "Luigi", "cliente": "ClienteB", "similarity": 0.91},
+                {"titolo": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software.", "autore": "Anna", "cliente": "ClienteC", "similarity": 0.75}
+            ],
+            "decision": {
+                "relevant_docs": [1, 2],
+                "irrelevant_docs": [0],
+                "reason": "Il secondo documento è perfettamente coerente con la richiesta; il terzo è utile come supporto tecnico. Il primo documento ha similarità bassa e non contiene informazioni sui movimenti di magazzino."
+            }
+        },
+        {
+            "prompt": "Come posso impostare le chiavi univoche per i clienti?",
+            "documents": [
+                {"titolo": "Chiavi univoche clienti", "content": "Spiega come configurare chiavi univoche per evitare duplicazioni di dati cliente.", "autore": "Luca", "cliente": "ClienteX", "similarity": 0.95},
+                {"titolo": "Gestione magazzini", "content": "Contiene istruzioni su come creare nuovi magazzini e assegnare codici identificativi.", "autore": "Marco", "cliente": "ClienteY", "similarity": 0.55},
+                {"titolo": "Parametri generali azienda", "content": "Descrive le impostazioni generali dell'azienda, ma non tratta le chiavi univoche.", "autore": "Elisa", "cliente": "ClienteZ", "similarity": 0.40}
+            ],
+            "decision": {
+                "relevant_docs": [0],
+                "irrelevant_docs": [1, 2],
+                "reason": "Solo il primo documento tratta direttamente le chiavi univoche. Gli altri hanno similarità più bassa e non forniscono informazioni utili per la richiesta."
+            }
+        },
+        {
+            "prompt": "Perché ricevo l'errore 'magazzino non trovato' quando salvo un ordine?",
+            "documents": [
+                {"titolo": "Errori comuni nella gestione ordini", "content": "L'errore 'magazzino non trovato' si verifica quando il magazzino indicato non è attivo o non è associato all'azienda selezionata.", "autore": "Verdi", "cliente": "Cliente1", "similarity": 0.92},
+                {"titolo": "Configurazione magazzino", "content": "Descrive come attivare un magazzino e associarlo a un'azienda dal menu Anagrafica Magazzini.", "autore": "Rossi", "cliente": "Cliente2", "similarity": 0.88},
+                {"titolo": "Report vendite annuali", "content": "Analisi delle vendite su base annuale con filtri per categoria e zona geografica.", "autore": "Neri", "cliente": "Cliente3", "similarity": 0.33}
+            ],
+            "decision": {
+                "relevant_docs": [0, 1],
+                "irrelevant_docs": [2],
+                "reason": "I primi due documenti trattano direttamente l'errore e la sua risoluzione. Il terzo documento ha bassa similarità e non è utile per il problema."
+            }
+        },
+        {
+            "prompt": "Come posso generare un report dei movimenti di magazzino?",
+            "documents": [
+                {"titolo": "Report vendite mensili", "content": "Contiene dati di vendita per cliente e prodotto.", "autore": "Mario", "cliente": "ClienteA", "similarity": 0.55},
+                {"titolo": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto.", "autore": "Luigi", "cliente": "ClienteB", "similarity": 0.76},
+                {"titolo": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software.", "autore": "Anna", "cliente": "ClienteC", "similarity": 0.74}
             ],
             "decision": {
                 "relevant_docs": [1, 2],
@@ -156,8 +200,8 @@ def select_documents(user_prompt: str, documents: list) -> dict:
         {
             "prompt": "Come posso modificare la fattura di un cliente?",
             "documents": [
-                {"titolo": "Fatture clienti", "content": "Guida alla gestione fatture e modifica dati cliente.", "autore": "Andrea", "cliente": "ClienteD"},
-                {"titolo": "Gestione magazzino", "content": "Movimenti di magazzino e scorte.", "autore": "Riccardo", "cliente": "ClienteE"}
+                {"titolo": "Fatture clienti", "content": "Guida alla gestione fatture e modifica dati cliente.", "autore": "Andrea", "cliente": "ClienteD", "similarity": 0.60},
+                {"titolo": "Gestione magazzino", "content": "Movimenti di magazzino e scorte.", "autore": "Riccardo", "cliente": "ClienteE", "similarity": 0.42}
             ],
             "decision": {
                 "relevant_docs": [0],
@@ -359,7 +403,7 @@ def gpt_request(messages):
     all_documents = []
     if tools["use_semantic"]:
         print("\nUso la ricerca SEMANTICA\n")
-        all_documents, output_line = search.semantic_search(user_prompt)
+        all_documents = search.semantic_search(user_prompt)
 
     if tools["use_keyword"]:
         print("\nUso la ricerca per KEYWORDS (ancora da implementare)\n")

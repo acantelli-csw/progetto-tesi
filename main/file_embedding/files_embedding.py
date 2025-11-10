@@ -68,7 +68,7 @@ for row in rows:
     # Salvataggio di tutti i chunk in un'unica query per maggior efficienza
     cursor.executemany(
         "INSERT INTO DocumentChunks (NumRI, Progressivo, TitoloRI, Cliente, Autore, Content, Embedding)" \
-        "VALUES (?, ?, ?, ?, ?, ?, CAST(CAST(? AS VARCHAR(MAX)) AS VECTOR(1536)))",
+        "VALUES (?, ?, ?, ?, ?, ?, CAST(CAST(? AS VARCHAR(MAX)) AS VECTOR(1536)))", 
         chunk_records
     )
 
