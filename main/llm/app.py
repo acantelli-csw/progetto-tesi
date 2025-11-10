@@ -151,7 +151,7 @@ if prompt := st.chat_input("Scrivi qui..."):
         for char in assistant_response:
             full_response += char
             message_placeholder.markdown(full_response + "▌", unsafe_allow_html=True)
-            time.sleep(0.02)
+            time.sleep(0.01)
         
         message_placeholder.markdown(full_response, unsafe_allow_html=True)
 

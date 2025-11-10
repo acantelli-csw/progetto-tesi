@@ -208,15 +208,15 @@ def select_documents(user_prompt: str, documents: list) -> dict:
 def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: list = None) -> str:
 
     context_text = "\n\n".join([
-        f" Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" 
+        f"Numero RI: {d['numero']} - Titolo: {d['titolo']}, Chunk: {d['progressivo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" 
         for d in selected_docs]) if selected_docs else "Nessun documento rilevante trovato."
 
     system_message = """
     Sei un assistente esperto di un software gestionale. Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti. 
     Regole:
     1. Non inventare informazioni o dettagli che non sono nei documenti.
-    2. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
-    3. Alla fine della risposta, fornire la lista dei documenti di riferimento usati.
+    2. Annotare ogni riferim    ento a un documento con un numero tra parentesi quadre [1], [2], ecc.
+    3. Alla fine della risposta, fornire la lista dei documenti di riferimento usati. In questo formato ('numero'=41699 nell'esempio): 1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - 'titolo', Chunk: 'progressivo+1', Autore: 'autore', Cliente 'cliente'.
     4. Mantieni la risposta chiara e strutturata, basata esclusivamente sui documenti forniti.
     5. Se non vengono forniti documenti rispondi in modo naturale e umano, come se fossi un chatbot.
     6. In ogni caso, genera l'oupput in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
@@ -224,27 +224,93 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
 
     examples = [
         {
+            "user_prompt": "Come posso creare un nuovo ordine cliente nel gestionale?",
+            "documents": [
+                {
+                    "numero": "41699",
+                    "titolo": "Creazione Ordine Cliente",
+                    "progressivo": "2",
+                    "content": "Per creare un nuovo ordine cliente, accedere al modulo Vendite > Ordini > Nuovo. Compilare i campi obbligatori: Cliente, Data, Magazzino e Condizioni di pagamento. Salvare per confermare. È possibile generare il documento PDF dal pulsante 'Stampa'.",
+                    "autore": "Rossi",
+                    "cliente": "Centro Software"
+                },
+                {
+                    "numero": "41700",
+                    "titolo": "Gestione anagrafiche clienti",
+                    "progressivo": "0",
+                    "content": "Le anagrafiche clienti devono essere create prima dell'inserimento di ordini o documenti di vendita.",
+                    "autore": "Bianchi",
+                    "cliente": "Centro Software"
+                }
+            ],
+            "answer": "Per creare un nuovo ordine cliente, accedi al modulo **Vendite → Ordini → Nuovo**. Compila i campi obbligatori (Cliente, Data, Magazzino e Condizioni di pagamento) e salva per confermare [1]. Ricorda che il cliente deve essere già presente in anagrafica prima di procedere [2].\n\nDocumenti di riferimento:\n1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - Creazione Ordine Cliente, Chunk: 3, Autore: Rossi, Cliente: Centro Software\n2. RI: [41700](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41700) - Gestione anagrafiche clienti, Chunk: 1, Autore: Bianchi, Cliente: Centro Software"
+        },
+        {
+            "user_prompt": "Cosa significa l'errore 'magazzino non trovato' durante il salvataggio di un ordine?",
+            "documents": [
+                {
+                    "numero": "42210",
+                    "titolo": "Errori comuni nella gestione ordini",
+                    "progressivo": "6",
+                    "content": "L'errore 'magazzino non trovato' si verifica quando il magazzino indicato nell'ordine non è attivo o non è associato all'azienda selezionata.",
+                    "autore": "Verdi",
+                    "cliente": "Centro Software"
+                },
+                {
+                    "numero": "42211",
+                    "titolo": "Configurazione magazzini",
+                    "progressivo": "1",
+                    "content": "Per verificare i magazzini attivi, accedere al menu Magazzini > Anagrafica. Attivare il flag 'Attivo' per renderli disponibili nei documenti di vendita.",
+                    "autore": "Neri",
+                    "cliente": "Centro Software"
+                }
+            ],
+            "answer": "L'errore **'magazzino non trovato'** indica che il magazzino selezionato non è attivo o non è associato all'azienda corrente [1]. Per risolvere, vai in **Magazzini → Anagrafica** e verifica che il magazzino sia attivo (flag 'Attivo' selezionato) e collegato all'azienda corretta [2].\n\nDocumenti di riferimento:\n1. RI: [42210](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=42210) - Errori comuni nella gestione ordini, Chunk: 7, Autore: Verdi, Cliente: Centro Software\n2. RI: [42211](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=42211) - Configurazione magazzini, Chunk: 2   , Autore: Neri, Cliente: Centro Software"
+        },
+        {
+            "user_prompt": "Qual è la politica aziendale per le ferie dei dipendenti?",
+            "documents": [],
+            "answer": "Mi dispiace, ma non ho trovato nessuna informazione sui criteri di gestione delle ferie dei dipendenti nei documenti disponibili. Posso però aiutarti a indirizzare la richiesta al reparto Risorse Umane o fornirti indicazioni generali se mi dai maggiori dettagli."
+        },
+        {
             "user_prompt": "Come configurare i piani di consegna e le chiavi univoche?",
             "documents": [
-                {"titolo": "Configurazione piani di consegna", "content": "Per impostare i piani di consegna, definire importazione e gestione dei dati.", "autore": "Mario", "cliente": "Alfa"},
-                {"titolo": "Gestione chiavi univoche", "content": "Le chiavi univoche devono essere definite per ogni cliente per evitare conflitti.", "autore": "Luca", "cliente": "Beta"}
+                {
+                    "numero": "12121",
+                    "titolo": "Configurazione piani di consegna",
+                    "progressivo": "4",
+                    "content": "Per impostare i piani di consegna, definire importazione e gestione dei dati.",
+                    "autore": "Mario",
+                    "cliente": "Alfa"
+                },
+                {
+                    "numero": "12345",
+                    "titolo": "Gestione chiavi univoche",
+                    "progressivo": "0",
+                    "content": "Le chiavi univoche devono essere definite per ogni cliente per evitare conflitti.",
+                    "autore": "Luca",
+                    "cliente": "Beta"}
             ],
-            "answer": "Per configurare i piani di consegna, impostare importazione e gestione dei dati [1]. Le chiavi univoche devono essere definite per ciascun cliente [2].\n\nDocumenti di riferimento:\n1. Titolo: Configurazione piani di consegna, Autore: Mario, Cliente: Alfa\n2. Titolo: Gestione chiavi univoche, Autore: Luca, Cliente: Beta"
+            "answer": "Per configurare i piani di consegna, impostare importazione e gestione dei dati [1]. Le chiavi univoche devono essere definite per ciascun cliente [2].\n\nDocumenti di riferimento:\n1. RI: [12121](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=12121) - Configurazione piani di consegna, Chunk: 5, Autore: Mario, Cliente: Alfa\n2. RI: [12345](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=12345) - Gestione chiavi univoche, Chunk: 1, Autore: Luca, Cliente: Beta"
         },
         {
             "user_prompt": "Come verificare i dati importati nel sistema?",
             "documents": [
-                {"titolo": "Controllo dati importati", "content": "Verificare che tutti i campi siano completi e corretti dopo l'importazione.", "autore": "Anna", "cliente": "Gamma"}
+                {
+                    "numero": "51000",
+                    "titolo": "Controllo dati importati",
+                    "progressivo": "3",
+                    "content": "Verificare che tutti i campi siano completi e corretti dopo l'importazione.",
+                    "autore": "Anna",
+                    "cliente": "Gamma"}
             ],
-            "answer": "Per verificare i dati importati, controllare che tutti i campi siano completi e corretti [1].\n\nDocumenti di riferimento:\n1. Titolo: Controllo dati importati, Autore: Anna, Cliente: Gamma"
+            "answer": "Per verificare i dati importati, controllare che tutti i campi siano completi e corretti [1].\n\nDocumenti di riferimento:\n1. RI: [51000](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51000) - Controllo dati importati, Chunk: 4, Autore: Anna, Cliente: Gamma"
         }
     ]
 
-        # Costruzione del testo degli esempi da dare al modello
-    
     few_shot_text = ""
     for ex in examples:
-        docs_text_example = "\n".join([f"{i+1}: Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" for i, d in enumerate(ex['documents'])
+        docs_text_example = "\n".join([f"{i+1}: Numero RI: {d['numero']} - Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" for i, d in enumerate(ex['documents'])
         ])
         few_shot_text += f"Prompt utente: {ex['user_prompt']}\nDocumenti:\n{docs_text_example}\nRisposta attesa:\n{ex['answer']}\n\n"
 
@@ -263,14 +329,6 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
     {context_text}
 
     Risposta attesa:
-    """
-
-    """    # Riassunto della chat precedente per dare contesto
-        history_text = ""
-        if chat_history:
-            for m in chat_history[-5:]:  # ultimi 5 messaggi per non esagerare coi token
-                role = "Utente" if m["role"] == "user" else "Assistente"
-                history_text += f"{role}: {m['content']}\n
     """
 
     response = client.chat.completions.create(
