@@ -98,7 +98,6 @@ def decide_tools(prompt: str) -> dict:
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ],
-        temperature=0
     )
     
     decision_text = response.choices[0].message.content
@@ -211,7 +210,7 @@ def select_documents(user_prompt: str, documents: list) -> dict:
         }
     ]
 
-    
+
     # Costruisco il few-shot text
     few_shot_text = ""
     for ex in examples:
@@ -229,7 +228,6 @@ def select_documents(user_prompt: str, documents: list) -> dict:
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ],
-        temperature=0
     )
 
     decision_text = response.choices[0].message.content
@@ -259,7 +257,7 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
     Sei un assistente esperto di un software gestionale. Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti. 
     Regole:
     1. Non inventare informazioni o dettagli che non sono nei documenti.
-    2. Annotare ogni riferim    ento a un documento con un numero tra parentesi quadre [1], [2], ecc.
+    2. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
     3. Alla fine della risposta, fornire la lista dei documenti di riferimento usati. In questo formato ('numero'=41699 nell'esempio): 1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - 'titolo', Chunk: 'progressivo+1', Autore: 'autore', Cliente 'cliente'.
     4. Mantieni la risposta chiara e strutturata, basata esclusivamente sui documenti forniti.
     5. Se non vengono forniti documenti rispondi in modo naturale e umano, come se fossi un chatbot.
@@ -376,12 +374,11 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
     """
 
     response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
+        model = MODEL_NAME,
+        messages = [
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ],
-        temperature=0
     )
 
     return response.choices[0].message.content
@@ -407,7 +404,7 @@ def gpt_request(messages):
 
     if tools["use_keyword"]:
         print("\nUso la ricerca per KEYWORDS (ancora da implementare)\n")
-        # all_documents += search.keyword_search(user_prompt)
+        all_documents += search.keyword_search(user_prompt)
 
     # 2 - Selezione documenti in base alla coerenza
     document_selection = []
@@ -485,12 +482,11 @@ def summarize_old_messages(messages, max_tokens):
     
     # Chimata LLM per riassunto
     response = client.chat.completions.create(
-        model=model_name,
-        messages=[
+        model = model_name,
+        messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text_to_summarize}
         ],
-        temperature=0,
         max_tokens=max_tokens
     )
 

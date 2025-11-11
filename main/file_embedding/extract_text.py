@@ -68,24 +68,20 @@ def extract_text_from_varbinary(file_data, extension, numero, reader):
 
                 # Se la relazione punta a un'immagine
                 if "image" in target_ref:
-                    if target_mode == "Internal":
-                        try:
-                            target_part = getattr(rel, "target_part", None)
-                            img_data = target_part.blob
-                            img = Image.open(BytesIO(img_data))
-                            img_np = np.array(img)
-                            result = reader.readtext(img_np)
+                    try:
+                        target_part = getattr(rel, "target_part", None)
+                        img_data = target_part.blob
+                        img = Image.open(BytesIO(img_data))
+                        img_np = np.array(img)
+                        result = reader.readtext(img_np)
 
-                            ocr_text = " ".join([res[1] for res in result])
-                            if ocr_text.strip():
-                                full_text += f"\n[OCR immagine embedded]: {ocr_text}\n"
+                        ocr_text = " ".join([res[1] for res in result])
+                        if ocr_text.strip():
+                            full_text += f"\n[OCR immagine embedded]: {ocr_text}\n"
 
-                        except Exception as e:
-                            print(f"Errore OCR immagine interna DOCX: {e}")
-
-                    elif target_mode == "External":
-                        print(f"Immagine esterna trovata e ignorata: {target_ref}")
-                        
+                    except Exception as e:
+                        print(f"Errore OCR: immagine esterna al DOCX. Elaboro il resto...\n")
+                    
             os.remove(tmp_path)
 
         # Caso 3: DOC (conversione + testo)

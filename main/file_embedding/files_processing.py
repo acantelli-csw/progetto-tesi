@@ -57,6 +57,7 @@ for row in rows:
     # Suddivisione in chunk
     chunks = splitter.split_text(text)
 
+    # ========== EMBEDDINGS ==========
     # Calcolo e salvataggio su DB degli embedding per ogni chunk
     chunk_records = []
     for i, chunk in enumerate(chunks):
@@ -71,11 +72,14 @@ for row in rows:
         "VALUES (?, ?, ?, ?, ?, ?, CAST(CAST(? AS VARCHAR(MAX)) AS VECTOR(1536)))", 
         chunk_records
     )
+    
+    # ========== INDEXING ==========
+    
+
 
     cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'elaborato' AND InstanceID = ?", (instance_id))
-
     conn.commit()
-    print(f"File processato: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40}\n")
+    print(f"File processato: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40} , Indici inversi creati.\n")
 
 cursor.close()
 conn.close()

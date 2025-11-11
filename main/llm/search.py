@@ -43,3 +43,7 @@ def semantic_search(prompt):
     top_docs = docs_sorted[:top_n]
         
     return top_docs
+
+def keyword_search(prompt):
+    
+    return []
