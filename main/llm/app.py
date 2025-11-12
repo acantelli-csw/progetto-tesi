@@ -1,52 +1,12 @@
 import streamlit as st
-import time
 import ui
 import llm
 
 # Configurazine base
-st.set_page_config(page_title="Assistente Documentale RI", page_icon="https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", layout="centered")
+st.set_page_config(page_title="Assistente Documentale RI", page_icon="https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", layout="wide")
 
 # Applica stile
 ui.apply_style()
-
-# Inizializza stato sidebar
-if "sidebar_open" not in st.session_state:
-    st.session_state.sidebar_open = True
-
-# Toggle apertura/chiusura
-top_col1, top_col2 = st.columns([1, 4])
-with top_col1:
-    if st.button("☰"):
-        st.session_state.sidebar_open = not st.session_state.sidebar_open
-
-if st.session_state.sidebar_open:
-    st.markdown(
-        """
-        <style>
-            [data-testid="stSidebar"] {
-                min-width: 25rem !important;
-                max-width: 42rem !important;
-                transition: all 0.3s ease;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-else:
-    st.markdown(
-        """
-        <style>
-            [data-testid="stSidebar"] {
-                width: 0 !important;
-                min-width: 0 !important;
-                max-width: 0 !important;
-                overflow: hidden !important;
-                transition: all 0.3s ease;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
 
 # Costruisci barra laterale per accesso utente
 with st.sidebar:
@@ -63,7 +23,7 @@ with st.sidebar:
         st.session_state.authenticated = False
         st.session_state.username = None
 
-    # Se l'utente non è autenticato → mostra login/registrazione
+    # NON autenticato → Login/Registrazione
     if not st.session_state.authenticated:
         action = st.radio("Seleziona azione:", ["Accedi", "Registrati"], horizontal=True)
     
@@ -96,7 +56,7 @@ with st.sidebar:
                 st.error("Questo nome utente esiste già.")
         st.stop()  # blocca il resto dell'app finché non è autenticato
 
-    # Se autenticato → mostra opzioni utente
+    # Autenticato → Opzioni utente
     else:
         username = st.session_state.username
         st.success(f"✅ Autenticato come **{username}**")
@@ -141,15 +101,16 @@ if prompt := st.chat_input("Scrivi qui..."):
 
     # Mostra la risposta dell'assistente in chat
     with st.chat_message("assistant", avatar="📄"):
-        full_response = ""
-        message_placeholder = st.empty()
+        with st.spinner(" Sto elaborando la risposta..."):
+            full_response = ""
+            message_placeholder = st.empty()
 
-        for token in llm.gpt_request(st.session_state.messages):
-            full_response += token
-            message_placeholder.markdown(full_response + "▌")
-        
-        message_placeholder.markdown(full_response)
+            for token in llm.gpt_request(st.session_state.messages):
+                full_response += token
+                message_placeholder.markdown(full_response + "▌")
+            
+            message_placeholder.markdown(full_response)
 
-        # Aggiungi la risposta dell'assistente alla cronologia chat
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
-        ui.save_chat_history(username, st.session_state.messages)
+            # Aggiungi la risposta dell'assistente alla cronologia chat
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            ui.save_chat_history(username, st.session_state.messages)

@@ -10,69 +10,76 @@ def apply_style():
         background-color: #f8f9fa;
         color: #212529;
         font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
     }
 
-    /* Contenitore messaggi */
-    [data-testid="stChatMessage"] {
-        border-radius: 0.75rem;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.5rem;
-        display: inline-block;
-        max-width: 70%;
-        word-wrap: break-word;
-        clear: both;
-    }
-
-    /* Messaggi utente */
-    [data-testid="stChatMessage"][data-testid="user"] {
-        background-color: #e9ecef;
-        float: right;
-    }
-
-    /* Messaggi assistant */
-    [data-testid="stChatMessage"][data-testid="assistant"] {
-        background-color: #ffffff;
-        border: 1px solid #dee2e6;
-        float: left;
-    }
-                
-    /* Campo di input chat */
-    .stChatInputContainer {
-        background-color: white !important;
-        border-radius: 0.75rem;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    /* Contenitore principale Streamlit (sidebar + contenuto) */
+    [data-testid="stHorizontalBlock"] {
+        display: flex;
+        flex-wrap: nowrap;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
     }
 
     /* Sidebar */
     section[data-testid="stSidebar"] {
         background-color: #ffffff;
         border-right: 1px solid #dee2e6;
-        min-width: 0px;
+        width: 20%;
+        min-width: 200px;
         max-width: 700px;
-        visibility: visible !important;
-        transform: none !important;
-        }
-    }
-    
-    .top-bar {
-        background-color: #f5f5f5;
-        padding: 0.6rem 1rem;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-    }
-    .title {
-        font-size: 1.2rem;
-        font-weight: 600;
-    }
-    .expander-container {
-        width: 250px;
+        transition: all 0.1s ease-in-out;
     }
 
-    /* Hover su input base */  
+    /* Contenuto principale */
+    [data-testid="stVerticalBlock"]:not(section[data-testid="stSidebar"] *) {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-start;
+        align-items: stretch;
+        padding: 1rem;
+        overflow-y: auto;  
+        box-sizing: border-box;
+    }
+        
+    /* Contenitore messaggi chat */
+    [data-testid="stChatMessage"] {
+        border-radius: 0.75rem;
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.5rem;
+        max-width: 70%;
+        word-wrap: break-word;
+        display: block;
+    }
+
+    /* Messaggi utente (a destra) */
+    [data-testid="stChatMessage"][data-testid="user"] {
+        background-color: #e9ecef;
+        margin-left: auto;
+    }
+
+    /* Messaggi assistant (a sinistra) */
+    [data-testid="stChatMessage"][data-testid="assistant"] {
+        background-color: #ffffff;
+        border: 1px solid #dee2e6;
+        margin-right: auto;
+    }
+
+    /* Campo input chat */
+    .stChatInputContainer {
+        background-color: white !important;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        width: 100%;
+        max-width: 800px;
+        margin-top: auto;
+    }
+
+    /* Hover su input base */
     div[data-baseweb="input"]:hover > div {
         background-color: #f8f9fa !important;
         border-radius: 0.75rem;
@@ -88,22 +95,33 @@ def apply_style():
         padding: 0.4rem 0.8rem !important;
         transition: all 0.2s ease-in-out;
     }
-    
-    /* Clear float dopo la chat */
-    [data-testid="stVerticalBlock"] {
-        overflow: auto;
+
+    /* Responsività */
+    @media (max-width: 768px) {
+        [data-testid="stHorizontalBlock"] {
+            flex-direction: column;
+        }
+        section[data-testid="stSidebar"] {
+            width: 100%;
+            max-width: none;
+            border-right: none;
+            border-bottom: 1px solid #dee2e6;
+        }
+        [data-testid="stVerticalBlock"]:not(section[data-testid="stSidebar"] *) {
+            padding: 0.5rem;
+        }
     }
- 
     </style>
     """, unsafe_allow_html=True)
 
 def load_testata():
-    st.markdown("<h1 style='text-align:center;'>📄 Assistente Documentale RI</h1>", unsafe_allow_html=True)
-    st.write("Benvenuto nel chatbot di BPM per la ricerca RAG delle RI!")
-    st.write("Posso aiutarti a trovare facilmente le informazioni che ti servono all'interno delle RI già sviluppate dai tuoi colleghi — così non dovrai ricominciare da zero!")
+    st.markdown("# 📄 Assistente Documentale RI", unsafe_allow_html=True)
+    st.markdown(" ")
+    st.write("Benvenuto! Sono il tuo assistente per la ricerca RAG delle RI.")
+    st.write("Posso aiutarti a trovare facilmente le informazioni che ti servono all'interno delle RI già sviluppate dai tuoi colleghi.")
 
     st.caption("Mi raccomando, verifica sempre i risultati ottenuti! Posso sbagliare anche io...")
-    st.caption("Per farlo puoi controllare direttamente le RI utilizzate per generare la risposta e fornite con essa.")
+    st.caption("Per farlo puoi controllare direttamente le RI utilizzate per generare la risposta e fornite in fondo ad essa.")
     st.divider()
 
 

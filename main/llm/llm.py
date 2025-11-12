@@ -4,7 +4,6 @@ import json
 import os
 import search
 import tiktoken
-import streamlit as st
 
 # 0. CONFIGURAZIONE =====================================================
 
@@ -22,7 +21,6 @@ MODEL_NAME = os.getenv("LLM_MODEL")
 
 
 # 1. DECISIONE TOOLS DA USARE =====================================================
-
 def decide_tools(prompt: str) -> dict:
 
     system_message = """
@@ -117,7 +115,6 @@ def decide_tools(prompt: str) -> dict:
 
 
 # 2. SELEZIONE DOCUMENTI =====================================================
-
 def select_documents(user_prompt: str, documents: list) -> dict:
     
     system_message = """
@@ -247,7 +244,6 @@ def select_documents(user_prompt: str, documents: list) -> dict:
 
 
 # 3. GENERAZIONE RISPOSTA FINALE =====================================================
-
 def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: list = None) -> str:
 
     context_text = "\n\n".join([
@@ -255,13 +251,14 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
         for d in selected_docs]) if selected_docs else "Nessun documento rilevante trovato."
 
     system_message = """
-    Sei un assistente esperto di un software gestionale. Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti. 
+    Sei un assistente esperto del software gestionale SAM dell'azienda Centro Software. 
+    Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti. 
     Regole:
     1. Non inventare informazioni o dettagli che non sono nei documenti.
     2. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
     3. Alla fine della risposta, fornire la lista dei documenti di riferimento usati. In questo formato ('numero'=41699 nell'esempio): 1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - 'titolo', Chunk: 'progressivo+1', Autore: 'autore', Cliente 'cliente'.
     4. Mantieni la risposta chiara e strutturata, basata esclusivamente sui documenti forniti.
-    5. Se non vengono forniti documenti rispondi in modo naturale e umano, come se fossi un chatbot.
+    5. Se non vengono forniti documenti rispondi in modo naturale e umano, come se fossi un chatbot. Ma cerca sempre di mantenere la conversazione professionale e inerente all'ambito lavorativo di cui ti occupi.
     6. In ogni caso, genera l'oupput in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
     """
 
@@ -398,7 +395,6 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
             
 
 # FLUSSO COMPLETO DEL CHATBOT =====================================================
-
 def gpt_request(messages):
 
     # Estrae l'ultimo prompt inserito dalla cronologia chat
@@ -406,8 +402,6 @@ def gpt_request(messages):
 
     # 1️ - Decisione strumenti
     tools = decide_tools(user_prompt)
-    print("\nRagionamento sugli strumenti da usare:")
-    print(tools["reason"])
 
     # 1.5 - Recupero documenti
     all_documents = []
@@ -416,7 +410,7 @@ def gpt_request(messages):
         all_documents = search.semantic_search(user_prompt)
 
     if tools["use_keyword"]:
-        print("\nUso la ricerca per KEYWORDS (ancora da implementare)\n")
+        print("\nUso la ricerca per KEYWORDS\n")
         all_documents += search.keyword_search(user_prompt)
 
     # 2 - Selezione documenti in base alla coerenza
@@ -440,38 +434,50 @@ def summarize_chat_history(chat_history, model_name=MODEL_NAME):
         return ""
     
     encoding = tiktoken.encoding_for_model(model_name)
-    max_tokens=3000
-    reserved_tokens_for_summary = 500
-    allowed_recent_tokens = max_tokens - reserved_tokens_for_summary
+    max_tokens=10000
+    reserved_tokens_for_summary = 2000
 
     # Se la chat è più corta del limite, restituisci tutta la chat senza ulteriori elaborazioni
-    total_chat_tokens = sum(len(encoding.encode(f"{'Utente' if m['role']=='user' else 'Assistente'}: {m['content']}\n")) for m in chat_history)
+    token_counts = [len(encoding.encode(f"{'Utente' if m['role']=='user' else 'Assistente'}: {m['content']}\n")) for m in chat_history]
+    total_tokens = sum(token_counts)
 
-    if total_chat_tokens <= max_tokens:
+    if total_tokens <= max_tokens:
         return "".join(f"{'Utente' if m['role']=='user' else 'Assistente'}: {m['content']}\n" for m in chat_history)
     
     recent_lines = []
+    old_lines = []
     recent_tokens = 0
+    old_tokens = 0
 
-    # Salvo messaggi più recenti
-    for m in reversed(chat_history):
-        role = "Utente" if m["role"] == "user" else "Assistente"
-        line = f"{role}: {m['content']}\n"
-        line_tokens = len(encoding.encode(line))
-        if recent_tokens + line_tokens <= allowed_recent_tokens:
-            recent_lines.insert(0, line)  # inserisci in cima per mantenere ordine cronologico
-            recent_tokens += line_tokens
+    # Salvo messaggi più vecchi (inizio)
+    for m, t in zip(chat_history, token_counts):
+        if old_tokens + t <= (max_tokens - reserved_tokens_for_summary) // 2:
+            role = "Utente" if m["role"] == "user" else "Assistente"
+            old_lines.append(f"{role}: {m['content']}\n")
+            old_tokens += t
         else:
-            break  # limite superato
- 
-    # Riassumo messaggi vecchi
-    old_messages = chat_history[:len(chat_history) - len(recent_lines)]
-    summary_text = ""
-    if old_messages:
-        summary = summarize_old_messages(old_messages, reserved_tokens_for_summary)
-        summary_text = f"Riassunto messaggi precedenti: {summary}\n"
+            break
 
-    return summary_text + "".join(recent_lines)
+    # Salvo messaggi più recenti (fine)
+    for m, t in zip(reversed(chat_history), reversed(token_counts)):
+        if recent_tokens + t <= (max_tokens - reserved_tokens_for_summary) // 2:
+            role = "Utente" if m["role"] == "user" else "Assistente"
+            recent_lines.insert(0, f"{role}: {m['content']}\n")  # inserisci in cima
+            recent_tokens += t
+        else:
+            break
+    
+    # Riassumo messaggi centrali
+    start_idx = len(old_lines)
+    end_idx = len(chat_history) - len(recent_lines)
+    central_messages = chat_history[start_idx:end_idx]
+    summary_text = ""
+    if central_messages:
+        summary_text = summarize_old_messages(central_messages, reserved_tokens_for_summary)
+        summary_text = f"Riassunto messaggi centrali: {summary_text}\n"
+
+    # Unisci tutto
+    return "".join(old_lines) + summary_text + "".join(recent_lines)
 
 # RIASSUNTO MESSAGGI VECCHI
 def summarize_old_messages(messages, max_tokens):
@@ -481,7 +487,7 @@ def summarize_old_messages(messages, max_tokens):
     if not messages:
         return ""
     
-    system_prompt = """Sei un assistente che deve riassumere i messaggi precedenti della chat
+    system_prompt = """Sei un assistente che deve riassumere i messaggi della chat
                         in modo sintetico, mantenendo solo i concetti principali.
                         Il riassunto deve essere chiaro, breve e utile al contesto"""
 
