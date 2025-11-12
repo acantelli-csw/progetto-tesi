@@ -4,6 +4,7 @@ import json
 import os
 import search
 import tiktoken
+import streamlit as st
 
 # 0. CONFIGURAZIONE =====================================================
 
@@ -373,16 +374,28 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
     Risposta attesa:
     """
 
-    response = client.chat.completions.create(
+    response_stream = client.chat.completions.create(
         model = MODEL_NAME,
         messages = [
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ],
+        stream=True
     )
 
-    return response.choices[0].message.content
+    # Lettura dei token generati
+    final_text = ""
+    for event in response_stream:
+        if not event.choices:
+            continue
 
+        choice = event.choices[0]
+        delta = getattr(choice, "delta", None)
+        if delta and getattr(delta, "content", None):
+            token = delta.content
+            final_text += token
+            yield token  # invia il token man mano che arriva
+            
 
 # FLUSSO COMPLETO DEL CHATBOT =====================================================
 
@@ -416,10 +429,8 @@ def gpt_request(messages):
             # Selezione documenti rilevanti
             selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
 
-    # 3 - Genera risposta finale
-    final_answer = generate_final_answer(user_prompt, selected_docs, messages)
-
-    return final_answer
+    # 3 - Genera risposta finale in modalità stream
+    return generate_final_answer(user_prompt, selected_docs, messages)
 
 
 # GESTIONE LUNGHEZZA CRONOLOGIA MESSAGGI =====================================================

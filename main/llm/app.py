@@ -142,19 +142,14 @@ if prompt := st.chat_input("Scrivi qui..."):
     # Mostra la risposta dell'assistente in chat
     with st.chat_message("assistant", avatar="📄"):
         full_response = ""
-
-        with st.spinner(" Sto elaborando la risposta..."):
-            assistant_response = llm.gpt_request(st.session_state.messages)
-
-        # Simula risposta stream tramite un piccolo delay e un cursore
         message_placeholder = st.empty()
-        for char in assistant_response:
-            full_response += char
-            message_placeholder.markdown(full_response + "▌", unsafe_allow_html=True)
-            time.sleep(0.01)
-        
-        message_placeholder.markdown(full_response, unsafe_allow_html=True)
 
-    # Aggiungi la risposta dell'assistente alla cronologia chat
-    st.session_state.messages.append({"role": "assistant", "content": full_response})
-    ui.save_chat_history(username, st.session_state.messages)
+        for token in llm.gpt_request(st.session_state.messages):
+            full_response += token
+            message_placeholder.markdown(full_response + "▌")
+        
+        message_placeholder.markdown(full_response)
+
+        # Aggiungi la risposta dell'assistente alla cronologia chat
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
+        ui.save_chat_history(username, st.session_state.messages)
