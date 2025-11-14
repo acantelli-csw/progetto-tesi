@@ -43,7 +43,7 @@ cursor.execute(query)
 
 rows = cursor.fetchall()
 
-# Elaborazione di ogni file
+# Elaborazione file estratti
 for row in rows:
 
     instance_id, cliente, numero, titolo, autore, file_data, extension = row

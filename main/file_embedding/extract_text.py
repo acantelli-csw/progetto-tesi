@@ -64,7 +64,6 @@ def extract_text_from_varbinary(file_data, extension, numero, reader):
             # --- OCR su immagini embedded ---
             for rel in doc.part.rels.values():
                 target_ref = getattr(rel, "target_ref", "")
-                target_mode = getattr(rel, "target_mode", "Internal")
 
                 # Se la relazione punta a un'immagine
                 if "image" in target_ref:
