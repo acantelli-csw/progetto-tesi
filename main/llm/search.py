@@ -1,8 +1,8 @@
 import ast
-import numpy as np
 import os
 import sys
 import re
+import numpy as np
 from typing import List, Dict, Tuple
 from rank_bm25 import BM25Okapi
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -38,25 +38,11 @@ def keyword_search(prompt) -> List[Dict]:
 
     docs = load_documents_from_db()
 
-    bm25_index, doc_ids, tokenized_docs = build_bm25_index(docs)
-
-    # Mostra statistiche
-    stats = get_document_stats(tokenized_docs)
-    print(f"\nDocumenti indicizzati: {stats['num_documents']}")
-    print(f"Token totali: {stats['total_tokens']}")
-    print(f"Lunghezza media documento: {stats['avg_doc_length']:.2f} token")
-    print(f"Termini unici: {stats['unique_terms']}")
+    bm25_index, doc_ids = build_bm25_index(docs)
 
     top_docs = get_top_documents(prompt, bm25_index, doc_ids, docs, top_k=3)
     
-    if top_docs:
-        for rank, doc in enumerate(top_docs, 1):
-            print(f"{rank}. ID: {doc['id']} | {doc['titolo']} (score: {doc['bm25_score']:.4f})")
-            print(f"   Autore: {doc['autore']} | Cliente: {doc['cliente']}")
-            print(f"   NumRI: {doc['numero']} | Progressivo: {doc['progressivo']}")
-            preview = doc['content'][:80] + "..." if len(doc['content']) > 80 else doc['content']
-            print(f"   {preview}\n")
-    else:
+    if not top_docs:
         print("Nessun risultato trovato\n")
 
     return top_docs
@@ -142,7 +128,7 @@ def search_bm25(
     
     return ranked_docs[:top_k]
 
-def build_bm25_index(docs: List[Dict]) -> Tuple[BM25Okapi, List[str], List[List[str]]]:
+def build_bm25_index(docs: List[Dict]) -> Tuple[BM25Okapi, List[str]]:
 
     doc_ids = [str(doc["id"]) for doc in docs]
     
@@ -152,7 +138,7 @@ def build_bm25_index(docs: List[Dict]) -> Tuple[BM25Okapi, List[str], List[List[
     # Crea l'indice BM25
     bm25_index = BM25Okapi(tokenized_docs)
     
-    return bm25_index, doc_ids, tokenized_docs
+    return bm25_index, doc_ids
 
 def tokenize(text: str) -> List[str]:
     text = text.lower()
@@ -177,20 +163,3 @@ ITALIAN_STOPWORDS = {
     'su', 'subito', 'sul', 'sulla', 'tanto', 'te', 'tempo', 'terzo', 'tra', 'tre',
     'triplo', 'ultimo', 'un', 'una', 'uno', 'va', 'vai', 'voi', 'volte', 'vostro'
 }
-
-def get_document_stats(tokenized_docs: List[List[str]]) -> Dict:
-
-    total_tokens = sum(len(doc) for doc in tokenized_docs)
-    avg_doc_length = total_tokens / len(tokenized_docs) if tokenized_docs else 0
-    
-    # Trova termini unici
-    unique_terms = set()
-    for doc in tokenized_docs:
-        unique_terms.update(doc)
-    
-    return {
-        "num_documents": len(tokenized_docs),
-        "total_tokens": total_tokens,
-        "avg_doc_length": avg_doc_length,
-        "unique_terms": len(unique_terms),
-    }
