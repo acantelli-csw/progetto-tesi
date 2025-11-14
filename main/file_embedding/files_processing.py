@@ -74,8 +74,7 @@ for row in rows:
     )
     
     # ========== INDEXING ==========
-    
-
+    # Per ora costruzione dinamica durante la search
 
     cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'elaborato' AND InstanceID = ?", (instance_id))
     conn.commit()
