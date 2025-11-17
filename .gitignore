@@ -16,4 +16,3 @@ uv.lock
 # User credentials and chat histories
 chat_history
 users.json
-main/llm/prova.py

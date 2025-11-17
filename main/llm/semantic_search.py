@@ -10,12 +10,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from file_embedding.db_connection import get_connection
 from file_embedding.embedding import get_embedding
 
-# Similarità coseno tra due vettori
-def cosine_similarity(vec1, vec2):
-    vec1 = np.array(vec1)
-    vec2 = np.array(vec2)
-    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
-
 def semantic_search(prompt, top_n=10):
     prompt_embedding = get_embedding(prompt)
     prompt_embedding_json = json.dumps(prompt_embedding)
@@ -209,3 +203,8 @@ def semantic_search_old(prompt):
     top_docs = docs_sorted[:top_n]
         
     return top_docs
+
+def cosine_similarity(vec1, vec2):
+    vec1 = np.array(vec1)
+    vec2 = np.array(vec2)
+    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
