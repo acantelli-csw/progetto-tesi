@@ -1,4 +1,5 @@
 import ast
+import json
 import os
 import sys
 import re
@@ -15,24 +16,52 @@ def cosine_similarity(vec1, vec2):
     vec2 = np.array(vec2)
     return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
 
-def semantic_search(prompt):
-
-    docs = load_documents_from_db()
-
+def semantic_search(prompt, top_n=10):
     prompt_embedding = get_embedding(prompt)
+    prompt_embedding_json = json.dumps(prompt_embedding)
 
-    for doc in docs:
-        doc["similarity"] = cosine_similarity(prompt_embedding, doc["embedding"])
+    # Passa il JSON direttamente nella query
+    query = f"""
+            DECLARE @prompt VECTOR(1536) = CAST('{prompt_embedding_json}' AS VECTOR(1536));
 
-    # Ordina decrescente per similarità
-    docs_sorted = sorted(docs, key=lambda x: x["similarity"], reverse=True)
+            SELECT TOP (?)
+                ID,
+                Content,
+                NumRI,
+                Progressivo,
+                Titolo,
+                Autore,
+                Cliente,
+                Embedding,
+                1 - VECTOR_DISTANCE('cosine', Embedding, @prompt) AS Similarity
+            FROM DocumentChunks
+            ORDER BY Similarity DESC;
+        """
 
-    # Prendi i top N documenti più simili
-    top_n = 10
-    top_docs = docs_sorted[:top_n]
-        
-    return top_docs
+    conn = get_connection()
+    cursor = conn.cursor()
 
+    cursor.execute(query, (top_n,))  # Solo top_n come parametro
+
+    rows = cursor.fetchall()
+
+    docs = []
+    for row in rows:
+        doc_id, content, numero, progressivo, titolo, autore, cliente, embedding_raw, similarity = row
+
+        docs.append({
+            "id": doc_id,
+            "content": content,
+            "numero": numero,
+            "progressivo": progressivo,
+            "titolo": titolo,
+            "autore": autore,
+            "cliente": cliente,
+            "embedding": embedding_raw,
+            "similarity": similarity
+        })
+
+    return docs
 
 def keyword_search(prompt) -> List[Dict]:
 
@@ -46,7 +75,6 @@ def keyword_search(prompt) -> List[Dict]:
         print("Nessun risultato trovato\n")
 
     return top_docs
-
 
 def load_documents_from_db() -> List[Dict]:
     
@@ -163,3 +191,21 @@ ITALIAN_STOPWORDS = {
     'su', 'subito', 'sul', 'sulla', 'tanto', 'te', 'tempo', 'terzo', 'tra', 'tre',
     'triplo', 'ultimo', 'un', 'una', 'uno', 'va', 'vai', 'voi', 'volte', 'vostro'
 }
+
+def semantic_search_old(prompt):
+
+    docs = load_documents_from_db()
+
+    prompt_embedding = get_embedding(prompt)
+
+    for doc in docs:
+        doc["similarity"] = cosine_similarity(prompt_embedding, doc["embedding"])
+
+    # Ordina decrescente per similarità
+    docs_sorted = sorted(docs, key=lambda x: x["similarity"], reverse=True)
+
+    # Prendi i top N documenti più simili
+    top_n = 10
+    top_docs = docs_sorted[:top_n]
+        
+    return top_docs
