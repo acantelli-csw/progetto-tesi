@@ -21,7 +21,8 @@ dependencies = [
     "textract",
     "PyMuPDF",
     "streamlit",
-    "rank_bm25"
+    "rank_bm25",
+    "pywin32"
 ]
 
 [build-system]

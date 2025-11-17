@@ -411,7 +411,7 @@ def gpt_request(messages):
 
     if tools["use_keyword"]:
         print("\nUso la ricerca per KEYWORDS\n")
-        all_documents += semantic_search.keyword_search(user_prompt)
+        # all_documents += semantic_search.keyword_search(user_prompt)
 
     # 2 - Selezione documenti in base alla coerenza
     document_selection = []

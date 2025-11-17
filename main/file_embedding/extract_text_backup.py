@@ -2,10 +2,11 @@ from PIL import Image
 from io import BytesIO
 from docx import Document
 import numpy as np
+import textract
 import tempfile
 import os
 import fitz  
-import win32com.client as win32
+
 
 # Estrai testo e immagini dai documenti in base all'estensione
 def extract_text_from_varbinary(file_data, extension, numero, reader):
@@ -47,7 +48,8 @@ def extract_text_from_varbinary(file_data, extension, numero, reader):
 
             os.remove(tmp_path)
 
-        # Caso 2: DOCX (testo + OCR)
+
+        # Caso 2: DOCX (testo + OCR immagini)
         elif ext == ".docx":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".docx") as tmp:
                 tmp.write(file_data)
@@ -81,53 +83,18 @@ def extract_text_from_varbinary(file_data, extension, numero, reader):
                     
             os.remove(tmp_path)
 
-        # Caso 3: DOC (converti in DOCX con Word e gestisci come DOCX)
+        # Caso 3: DOC (conversione + testo)
         elif ext == ".doc":
             with tempfile.NamedTemporaryFile(delete=False, suffix=".doc") as tmp:
                 tmp.write(file_data)
-                tmp_doc_path = tmp.name
-
-            # Percorso DOCX convertito
-            tmp_docx_path = tmp_doc_path + ".docx"
-
-            # --- Conversione tramite Word ---
-            word = win32.Dispatch("Word.Application")
-            word.Visible = False
-            doc_obj = word.Documents.Open(tmp_doc_path)
-
-            # 16 = formato DOCX
-            doc_obj.SaveAs(tmp_docx_path, FileFormat=16)
-            doc_obj.Close()
-            word.Quit()
-
-            # Da qui lo elaboriamo come un DOCX
-            doc = Document(tmp_docx_path)
-
-            # --- Testo nativo ---
-            for p in doc.paragraphs:
-                full_text += p.text + "\n"
-
-            # --- OCR immagini embedded ---
-            for rel in doc.part.rels.values():
-                target_ref = getattr(rel, "target_ref", "")
-
-                if "image" in target_ref:
-                    try:
-                        target_part = getattr(rel, "target_part", None)
-                        img_data = target_part.blob
-                        img = Image.open(BytesIO(img_data))
-                        img_np = np.array(img)
-                        result = reader.readtext(img_np)
-
-                        ocr_text = " ".join([res[1] for res in result])
-                        if ocr_text.strip():
-                            full_text += f"\n[OCR immagine embedded]: {ocr_text}\n"
-
-                    except Exception as e:
-                        print(f"Errore OCR: immagine esterna al DOCX. Elaboro il resto...\n")
-
-            os.remove(tmp_doc_path)
-            os.remove(tmp_docx_path)
+                tmp_path = tmp.name
+            try:
+                text = textract.process(tmp_path).decode("utf-8")
+                full_text += text
+            except Exception as e:
+                print(f"Errore estrazione DOC: {e}")
+            finally:
+                os.remove(tmp_path)
 
         # Caso non gestito
         else:

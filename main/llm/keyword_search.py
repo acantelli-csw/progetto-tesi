@@ -52,15 +52,8 @@ def setup_fts_table(conn):
 # FUNZIONI DI RICERCA OTTIMIZZATE
 # ============================================================
 
-def keyword_search_optimized(prompt: str, top_k: int = 3) -> List[Dict]:
-    """
-    Esegue keyword search usando l'indice FTS5 del database.
-    
-    Performance:
-    - O(log n) invece di O(n)
-    - Nessun caricamento in memoria
-    - Ranking BM25 nativo
-    """
+def keyword_search_optimized(prompt: str, top_k: int = 10) -> List[Dict]:
+
     conn = get_connection()
     cursor = conn.cursor()
     
