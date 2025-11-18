@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI
 import json
 import os
-import semantic_search
+import search
 import tiktoken
 
 # 0. CONFIGURAZIONE =====================================================
@@ -407,11 +407,11 @@ def gpt_request(messages):
     all_documents = []
     if tools["use_semantic"]:
         print("\nUso la ricerca SEMANTICA\n")
-        all_documents = semantic_search.semantic_search(user_prompt)
+        all_documents = search.semantic_search(user_prompt)
 
     if tools["use_keyword"]:
         print("\nUso la ricerca per KEYWORDS\n")
-        # all_documents += semantic_search.keyword_search(user_prompt)
+        all_documents += search.keyword_search(user_prompt)
 
     # 2 - Selezione documenti in base alla coerenza
     document_selection = []

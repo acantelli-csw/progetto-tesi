@@ -11,10 +11,11 @@ from file_embedding.db_connection import get_connection
 from file_embedding.embedding import get_embedding
 
 def semantic_search(prompt, top_n=10):
+
     prompt_embedding = get_embedding(prompt)
     prompt_embedding_json = json.dumps(prompt_embedding)
 
-    # Passa il JSON direttamente nella query
+    # Query per calcolo similarità coseno direttamente nel DB
     query = f"""
             DECLARE @prompt VECTOR(1536) = CAST('{prompt_embedding_json}' AS VECTOR(1536));
 
@@ -35,7 +36,7 @@ def semantic_search(prompt, top_n=10):
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute(query, (top_n,))  # Solo top_n come parametro
+    cursor.execute(query, (top_n,))
 
     rows = cursor.fetchall()
 
@@ -57,6 +58,7 @@ def semantic_search(prompt, top_n=10):
 
     return docs
 
+
 def keyword_search(prompt) -> List[Dict]:
 
     docs = load_documents_from_db()
@@ -69,6 +71,7 @@ def keyword_search(prompt) -> List[Dict]:
         print("Nessun risultato trovato\n")
 
     return top_docs
+
 
 def load_documents_from_db() -> List[Dict]:
     
@@ -104,6 +107,7 @@ def load_documents_from_db() -> List[Dict]:
     
     return docs
 
+
 def get_top_documents(
     query: str,
     bm25_index: BM25Okapi,
@@ -124,6 +128,7 @@ def get_top_documents(
         top_docs.append(doc)
     
     return top_docs
+
 
 def search_bm25(
     query: str,
@@ -150,6 +155,7 @@ def search_bm25(
     
     return ranked_docs[:top_k]
 
+
 def build_bm25_index(docs: List[Dict]) -> Tuple[BM25Okapi, List[str]]:
 
     doc_ids = [str(doc["id"]) for doc in docs]
@@ -169,6 +175,7 @@ def tokenize(text: str) -> List[str]:
     tokens = [t for t in tokens if t not in ITALIAN_STOPWORDS]
     return tokens
 
+
 ITALIAN_STOPWORDS = {
     'a', 'adesso', 'ai', 'al', 'alla', 'allo', 'allora', 'altre', 'altri', 'altro',
     'anche', 'ancora', 'avere', 'aveva', 'avevano', 'ben', 'buono', 'che', 'chi',
@@ -185,26 +192,3 @@ ITALIAN_STOPWORDS = {
     'su', 'subito', 'sul', 'sulla', 'tanto', 'te', 'tempo', 'terzo', 'tra', 'tre',
     'triplo', 'ultimo', 'un', 'una', 'uno', 'va', 'vai', 'voi', 'volte', 'vostro'
 }
-
-def semantic_search_old(prompt):
-
-    docs = load_documents_from_db()
-
-    prompt_embedding = get_embedding(prompt)
-
-    for doc in docs:
-        doc["similarity"] = cosine_similarity(prompt_embedding, doc["embedding"])
-
-    # Ordina decrescente per similarità
-    docs_sorted = sorted(docs, key=lambda x: x["similarity"], reverse=True)
-
-    # Prendi i top N documenti più simili
-    top_n = 10
-    top_docs = docs_sorted[:top_n]
-        
-    return top_docs
-
-def cosine_similarity(vec1, vec2):
-    vec1 = np.array(vec1)
-    vec2 = np.array(vec2)
-    return np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
