@@ -104,6 +104,7 @@ def decide_tools(prompt: str) -> dict:
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ],
+        temperature=0.1,
     )
     
     decision_text = response.choices[0].message.content
@@ -223,6 +224,7 @@ def select_documents(user_prompt: str, documents: list) -> dict:
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ],
+        temperature=0.1,
     )
 
     decision_text = response.choices[0].message.content
@@ -381,7 +383,8 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message}
         ],
-        stream=True
+        temperature=0.5,
+        stream=True,
     )
 
     # Lettura dei token generati
@@ -514,6 +517,7 @@ def summarize_old_messages(messages, max_tokens):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text_to_summarize}
         ],
+        temperature=0.35,
         max_tokens=max_tokens
     )
 
