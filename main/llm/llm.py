@@ -24,20 +24,26 @@ MODEL_NAME = os.getenv("LLM_MODEL")
 def decide_tools(prompt: str) -> dict:
 
     system_message = """
-    Sei un assistente decisionale. Devi rispondere SOLO con una decisione su
-    quali strumenti di ricerca usare per un prompt utente, in base alla
-    pertinenza ai documenti di richieste di implementazione clienti
-    per un software gestionale aziendale.
+    Sei un assistente decisionale esperto del software gestionale SAM ERP2 dell'azienda Centro Software. 
+    Devi rispondere SOLO con una decisione su quali strumenti di ricerca usare per un prompt utente, 
+    basandoti sul tipo di richiesta e sulla pertinenza rispetto ai documenti contenenti le Richieste di Implementazione (RI) fatte dai clienti.
+
+    Considera quanto segue:
+    - Il software SAM ERP2 ha funzionalità standard note, e il modello conosce queste funzionalità.
+    - Le personalizzazioni e i plugin richiesti dai clienti sono invece contenuti nei documenti da ricercare.
+    - Per richieste su funzionalità standard, entrambe le ricerche (semantica e keyword) possono essere utili.
+    - Per richieste più generiche su plugin o personalizzazioni, la ricerca semantica aiuta a trovare anche concetti correlati,
+    mentre la ricerca per keyword permette di trovare riferimenti precisi ad aziende, clienti o tipologie di plugin nelle RI.
 
     I due sistemi di ricerca:
-    1. Ricerca semantica: per concetti generali, complessi o combinazioni di funzionalità.
-    2. Ricerca per keyword: per termini specifici, nomi di moduli o funzionalità precise.
+    1. Ricerca semantica: adatta per concetti generali, macro-argomenti o combinazioni di funzionalità.
+    2. Ricerca per keyword: adatta per termini specifici, nomi di moduli, aziende o funzionalità precise, in particolare plugin/customizzazioni.
 
     Rispondi SEMPRE in formato JSON:
     {
-        "use_semantic": true/false,
-        "use_keyword": true/false,
-        "reason": "<spiegazione breve della decisione>"
+        "use_semantic": True/False,
+        "use_keyword": True/False,
+        "reason": "<spiegazione breve della decisione, indicando se la richiesta riguarda standard, plugin o entrambe le tipologie>"
     }
     """
 
@@ -47,7 +53,7 @@ def decide_tools(prompt: str) -> dict:
             "decision": {
                 "use_semantic": True,
                 "use_keyword": False,
-                "reason": "Richiesta di report generali, utile usare ricerca semantica."
+                "reason": "Richiesta generica su funzionalità standard di SAM ERP2 (report vendite). La ricerca semantica aiuta a trovare documenti con esempi di report, anche da plugin correlati."
             }
         },
         {
@@ -55,34 +61,35 @@ def decide_tools(prompt: str) -> dict:
             "decision": {
                 "use_semantic": False,
                 "use_keyword": True,
-                "reason": "Richiesta precisa su documenti specifici, meglio ricerca per keyword."
+                "reason": "Richiesta precisa su documenti standard di SAM ERP2 (fatture cliente). La ricerca per keyword trova velocemente riferimenti a moduli contabilità e fatturazione specifici."
             }
         },
         {
-            "prompt": "Implementazione mrp",
+            "prompt": "Implementazione personalizzata di MRP per un cliente con esigenze particolari",
             "decision": {
                 "use_semantic": True,
                 "use_keyword": True,
-                "reason": "Richiesta generica ma include termini specifici dei moduli."
+                "reason": "Richiesta su plugin o personalizzazioni MRP. La ricerca semantica aiuta a trovare concetti correlati, la keyword trova riferimenti a RI specifiche già sviluppate."
             }
         },
         {
-            "prompt": "Configurazione di un modulo di magazzino e contabilità?",
+            "prompt": "Configurazione di un modulo di magazzino e contabilità in SAM ERP2",
             "decision": {
                 "use_semantic": True,
                 "use_keyword": True,
-                "reason": "Richiesta generica ma include termini specifici dei moduli."
+                "reason": "Richiesta generica che include moduli standard, ma anche possibili personalizzazioni: entrambe le ricerche possono essere utili."
             }
         },
         {
-            "prompt": "Quali sono le migliori tecniche di gestione del tempo?",
+            "prompt": "Quali sono le migliori tecniche di gestione del tempo per i dipendenti?",
             "decision": {
                 "use_semantic": False,
                 "use_keyword": False,
-                "reason": "Non riguarda i documenti o funzionalità del software gestionale."
+                "reason": "Non riguarda funzionalità standard né plugin di SAM ERP2, quindi i documenti RI non sono rilevanti."
             }
         }
     ]
+
 
     # Costruisco il prompt few-shot
     few_shot_text = ""
@@ -118,27 +125,30 @@ def decide_tools(prompt: str) -> dict:
 def select_documents(user_prompt: str, documents: list) -> dict:
     
     system_message = """
-    Sei un assistente decisionale incaricato di filtrare documenti estratti da
-    un sistema di ricerca. Devi identificare quali, tra i documenti estratti, sono quelli 
-    strettamente utili per rispondere a una richiesta utente e 
-    coerenti con essa nello specifico e quali no.
-    Questo perchè la ricerca documentale fornisce sempre i top 10 documenti più rilevanti 
-    ma non è detto che siano sempre tutti effettivamente utili. Per ciascun documento viene fornito, 
-    oltre al contenuto, anche il valore di similarità coseno del suo embedding con quello del 
-    prompt utente. Puoi sfruttare anche queste informazioni per filtrare i documenti 
-    (ad esempio per valori notevolmente più bassi degli altri).
+    Sei un assistente decisionale incaricato di filtrare documenti estratti da un sistema 
+    di ricerca per il software gestionale SAM ERP2 dell'azienda Centro Software. 
+    Devi identificare quali documenti tra quelli estratti sono strettamente utili per rispondere a una richiesta
+    utente e coerenti con essa nello specifico, distinguendo tra funzionalità standard e plugin/customizzazioni. 
 
-    Criteri:
-    - Il documento è rilevante se contiene informazioni utili per rispondere
-      al prompt dell'utente.
-    - Alcuni documenti potrebbero essere estratti solo perché moderatamente
-      coerenti, ma non aiutano concretamente nella risposta.
-    - Rispondi SEMPRE in formato JSON con gli indici dei documenti:
-      {
-          "relevant_docs": [indici dei documenti utili],
-          "irrelevant_docs": [indici dei documenti non utili],
-          "reason": "<breve spiegazione>"
-      }
+    Nota:
+    - La ricerca documentale restituisce sempre i top 10 documenti più rilevanti, ma non tutti sono effettivamente utili.
+    - Per ciascun documento è disponibile il contenuto e il valore di similarità coseno con il prompt utente. 
+    Usa queste informazioni come guida, ma valuta anche il contenuto reale in termini di utilità per la risposta e la coerenza con la domanda.
+
+    Criteri di rilevanza:
+    1. Un documento è rilevante se contiene informazioni concrete che aiutano a rispondere 
+    alla richiesta, sia su funzionalità standard che su plugin/customizzazioni.
+    2. Alcuni documenti possono essere solo moderatamente coerenti o riferirsi a plugin 
+    non pertinenti alla richiesta: questi vanno considerati non utili.
+    3. Considera la differenza tra standard e plugin: se il prompt riguarda una funzionalità standard, anche documenti 
+    sui plugin correlati possono essere utili, mentre se riguarda plugin specifici, concentrati sui documenti che li contengono.
+
+    Rispondi SEMPRE in formato JSON:
+    {
+        "relevant_docs": [indici dei documenti utili],
+        "irrelevant_docs": [indici dei documenti non utili],
+        "reason": "<breve spiegazione della decisione, indicando se la rilevanza dipende da standard, plugin o entrambe le tipologie>"
+    }
     """
 
     examples = [
@@ -146,64 +156,51 @@ def select_documents(user_prompt: str, documents: list) -> dict:
             "prompt": "Come posso generare un report dei movimenti di magazzino?",
             "documents": [
                 {"titolo": "Report vendite mensili", "content": "Contiene dati di vendita per cliente e prodotto.", "autore": "Mario", "cliente": "ClienteA", "similarity": 0.42},
-                {"titolo": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto.", "autore": "Luigi", "cliente": "ClienteB", "similarity": 0.91},
-                {"titolo": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software.", "autore": "Anna", "cliente": "ClienteC", "similarity": 0.75}
+                {"titolo": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto nel modulo standard di SAM ERP2.", "autore": "Luigi", "cliente": "ClienteB", "similarity": 0.91},
+                {"titolo": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software, utile per eventuali personalizzazioni dei report.", "autore": "Anna", "cliente": "ClienteC", "similarity": 0.75}
             ],
             "decision": {
                 "relevant_docs": [1, 2],
                 "irrelevant_docs": [0],
-                "reason": "Il secondo documento è perfettamente coerente con la richiesta; il terzo è utile come supporto tecnico. Il primo documento ha similarità bassa e non contiene informazioni sui movimenti di magazzino."
+                "reason": "Il secondo documento contiene informazioni dirette sui movimenti di magazzino standard. Il terzo è utile come supporto tecnico per configurazioni o personalizzazioni. Il primo documento non è rilevante per la richiesta."
             }
         },
         {
             "prompt": "Come posso impostare le chiavi univoche per i clienti?",
             "documents": [
-                {"titolo": "Chiavi univoche clienti", "content": "Spiega come configurare chiavi univoche per evitare duplicazioni di dati cliente.", "autore": "Luca", "cliente": "ClienteX", "similarity": 0.95},
-                {"titolo": "Gestione magazzini", "content": "Contiene istruzioni su come creare nuovi magazzini e assegnare codici identificativi.", "autore": "Marco", "cliente": "ClienteY", "similarity": 0.55},
+                {"titolo": "Chiavi univoche clienti", "content": "Spiega come configurare chiavi univoche per evitare duplicazioni di dati cliente nel modulo anagrafica clienti standard.", "autore": "Luca", "cliente": "ClienteX", "similarity": 0.95},
+                {"titolo": "Gestione magazzini", "content": "Istruzioni per creare nuovi magazzini e assegnare codici identificativi.", "autore": "Marco", "cliente": "ClienteY", "similarity": 0.55},
                 {"titolo": "Parametri generali azienda", "content": "Descrive le impostazioni generali dell'azienda, ma non tratta le chiavi univoche.", "autore": "Elisa", "cliente": "ClienteZ", "similarity": 0.40}
             ],
             "decision": {
                 "relevant_docs": [0],
                 "irrelevant_docs": [1, 2],
-                "reason": "Solo il primo documento tratta direttamente le chiavi univoche. Gli altri hanno similarità più bassa e non forniscono informazioni utili per la richiesta."
+                "reason": "Solo il primo documento tratta direttamente la funzionalità standard di chiavi univoche. Gli altri documenti non sono pertinenti."
             }
         },
         {
             "prompt": "Perché ricevo l'errore 'magazzino non trovato' quando salvo un ordine?",
             "documents": [
                 {"titolo": "Errori comuni nella gestione ordini", "content": "L'errore 'magazzino non trovato' si verifica quando il magazzino indicato non è attivo o non è associato all'azienda selezionata.", "autore": "Verdi", "cliente": "Cliente1", "similarity": 0.92},
-                {"titolo": "Configurazione magazzino", "content": "Descrive come attivare un magazzino e associarlo a un'azienda dal menu Anagrafica Magazzini.", "autore": "Rossi", "cliente": "Cliente2", "similarity": 0.88},
+                {"titolo": "Configurazione magazzino", "content": "Descrive come attivare un magazzino e associarlo a un'azienda dal menu Anagrafica Magazzini standard e plugin opzionali.", "autore": "Rossi", "cliente": "Cliente2", "similarity": 0.88},
                 {"titolo": "Report vendite annuali", "content": "Analisi delle vendite su base annuale con filtri per categoria e zona geografica.", "autore": "Neri", "cliente": "Cliente3", "similarity": 0.33}
             ],
             "decision": {
                 "relevant_docs": [0, 1],
                 "irrelevant_docs": [2],
-                "reason": "I primi due documenti trattano direttamente l'errore e la sua risoluzione. Il terzo documento ha bassa similarità e non è utile per il problema."
-            }
-        },
-        {
-            "prompt": "Come posso generare un report dei movimenti di magazzino?",
-            "documents": [
-                {"titolo": "Report vendite mensili", "content": "Contiene dati di vendita per cliente e prodotto.", "autore": "Mario", "cliente": "ClienteA", "similarity": 0.55},
-                {"titolo": "Movimenti di magazzino", "content": "Elenco dettagliato dei movimenti di magazzino con filtri per data e prodotto.", "autore": "Luigi", "cliente": "ClienteB", "similarity": 0.76},
-                {"titolo": "Guida configurazione magazzino", "content": "Istruzioni su come configurare il modulo magazzino nel software.", "autore": "Anna", "cliente": "ClienteC", "similarity": 0.74}
-            ],
-            "decision": {
-                "relevant_docs": [1, 2],
-                "irrelevant_docs": [0],
-                "reason": "Il secondo e terzo documento contengono informazioni direttamente utili al report richiesto."
+                "reason": "I primi due documenti contengono informazioni dirette sul problema e sulla risoluzione, sia in funzionalità standard che in plugin. Il terzo documento non è rilevante."
             }
         },
         {
             "prompt": "Come posso modificare la fattura di un cliente?",
             "documents": [
-                {"titolo": "Fatture clienti", "content": "Guida alla gestione fatture e modifica dati cliente.", "autore": "Andrea", "cliente": "ClienteD", "similarity": 0.60},
+                {"titolo": "Fatture clienti", "content": "Guida alla gestione delle fatture e modifica dei dati cliente nel modulo contabilità standard.", "autore": "Andrea", "cliente": "ClienteD", "similarity": 0.60},
                 {"titolo": "Gestione magazzino", "content": "Movimenti di magazzino e scorte.", "autore": "Riccardo", "cliente": "ClienteE", "similarity": 0.42}
             ],
             "decision": {
                 "relevant_docs": [0],
                 "irrelevant_docs": [1],
-                "reason": "Solo il primo documento riguarda la modifica delle fatture."
+                "reason": "Solo il primo documento tratta la modifica delle fatture (funzionalità standard). Il secondo non è pertinente."
             }
         }
     ]
@@ -251,16 +248,20 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
         for d in selected_docs]) if selected_docs else "Nessun documento rilevante trovato."
 
     system_message = """
-    Sei un assistente esperto del software gestionale SAM dell'azienda Centro Software. 
-    Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti. 
+    Sei un assistente esperto del software gestionale SAM ERP2 dell'azienda Centro Software. 
+    Conosci le funzionalità standard del software e la distinzione tra funzioni native e plugin/customizzazioni sviluppate su richiesta dei clienti. 
+    Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti, integrando le tue conoscenze pregresse solo per distinguere cosa è standard e cosa è personalizzato. 
+
     Regole:
-    1. Non inventare informazioni o dettagli che non sono nei documenti.
-    2. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
-    3. Alla fine della risposta, fornire la lista dei documenti di riferimento usati. In questo formato ('numero'=41699 nell'esempio): 1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - 'titolo', Chunk: 'progressivo+1', Autore: 'autore', Cliente 'cliente'.
-    4. Mantieni la risposta chiara e strutturata, basata esclusivamente sui documenti forniti.
-    5. Se non vengono forniti documenti rispondi in modo naturale e umano, come se fossi un chatbot. Ma cerca sempre di mantenere la conversazione professionale e inerente all'ambito lavorativo di cui ti occupi.
-    6. In ogni caso, genera l'oupput in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
+    1. Non inventare informazioni o dettagli che non sono nei documenti forniti. 
+    2. Se una funzionalità è standard e nota dal tuo modello, puoi chiarirlo, ma evidenzia sempre quando una funzionalità è invece un plugin o una personalizzazione basata su Richieste di implementazione (RI) fornite nei documenti.
+    3. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
+    4. Alla fine della risposta, fornire la lista dei documenti di riferimento usati. In questo formato ('numero'=41699 nell'esempio): 1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - 'titolo', Chunk: 'progressivo+1', Autore: 'autore', Cliente 'cliente'.
+    5. Mantieni la risposta chiara, strutturata e basata esclusivamente sui documenti forniti per quanto riguarda le personalizzazioni.
+    6. Se non vengono forniti documenti, rispondi in modo naturale e professionale, facendo riferimento solo alle funzionalità standard conosciute di SAM ERP2.
+    7. Genera l'output in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
     """
+
 
     examples = [
         {
@@ -283,7 +284,7 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
                     "cliente": "Centro Software"
                 }
             ],
-            "answer": "Per creare un nuovo ordine cliente, accedi al modulo **Vendite → Ordini → Nuovo**. Compila i campi obbligatori (Cliente, Data, Magazzino e Condizioni di pagamento) e salva per confermare [1]. Ricorda che il cliente deve essere già presente in anagrafica prima di procedere [2].\n\nDocumenti di riferimento:\n1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - Creazione Ordine Cliente, Chunk: 3, Autore: Rossi, Cliente: Centro Software\n2. RI: [41700](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41700) - Gestione anagrafiche clienti, Chunk: 1, Autore: Bianchi, Cliente: Centro Software"
+            "answer": "Per creare un nuovo ordine cliente in **SAM ERP2**, accedi al modulo **Vendite → Ordini → Nuovo**. Compila i campi obbligatori (Cliente, Data, Magazzino e Condizioni di pagamento) e salva per confermare [1]. Assicurati che il cliente sia già presente in anagrafica [2].\n\nDocumenti di riferimento:\n1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - Creazione Ordine Cliente, Chunk: 3, Autore: Rossi, Cliente: Centro Software\n2. RI: [41700](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41700) - Gestione anagrafiche clienti, Chunk: 1, Autore: Bianchi, Cliente: Centro Software"
         },
         {
             "user_prompt": "Cosa significa l'errore 'magazzino non trovato' durante il salvataggio di un ordine?",
@@ -305,12 +306,12 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
                     "cliente": "Centro Software"
                 }
             ],
-            "answer": "L'errore **'magazzino non trovato'** indica che il magazzino selezionato non è attivo o non è associato all'azienda corrente [1]. Per risolvere, vai in **Magazzini → Anagrafica** e verifica che il magazzino sia attivo (flag 'Attivo' selezionato) e collegato all'azienda corretta [2].\n\nDocumenti di riferimento:\n1. RI: [42210](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=42210) - Errori comuni nella gestione ordini, Chunk: 7, Autore: Verdi, Cliente: Centro Software\n2. RI: [42211](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=42211) - Configurazione magazzini, Chunk: 2   , Autore: Neri, Cliente: Centro Software"
+            "answer": "L'errore **'magazzino non trovato'** in **SAM ERP2** indica che il magazzino selezionato non è attivo o non è associato all'azienda corrente [1]. Per risolvere, vai in **Magazzini → Anagrafica**, verifica che il magazzino sia attivo (flag 'Attivo' selezionato) e collegato all'azienda corretta [2].\n\nDocumenti di riferimento:\n1. RI: [42210](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=42210) - Errori comuni nella gestione ordini, Chunk: 7, Autore: Verdi, Cliente: Centro Software\n2. RI: [42211](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=42211) - Configurazione magazzini, Chunk: 2, Autore: Neri, Cliente: Centro Software"
         },
         {
             "user_prompt": "Qual è la politica aziendale per le ferie dei dipendenti?",
             "documents": [],
-            "answer": "Mi dispiace, ma non ho trovato nessuna informazione sui criteri di gestione delle ferie dei dipendenti nei documenti disponibili. Posso però aiutarti a indirizzare la richiesta al reparto Risorse Umane o fornirti indicazioni generali se mi dai maggiori dettagli."
+            "answer": "Mi dispiace, ma non ho trovato informazioni sulle politiche ferie nei documenti disponibili. Posso però aiutarti a indirizzare la richiesta al reparto Risorse Umane o fornire indicazioni generali se mi dai maggiori dettagli."
         },
         {
             "user_prompt": "Come configurare i piani di consegna e le chiavi univoche?",
@@ -319,7 +320,7 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
                     "numero": "12121",
                     "titolo": "Configurazione piani di consegna",
                     "progressivo": "4",
-                    "content": "Per impostare i piani di consegna, definire importazione e gestione dei dati.",
+                    "content": "Per impostare i piani di consegna, definire importazione e gestione dei dati nel modulo standard di SAM ERP2.",
                     "autore": "Mario",
                     "cliente": "Alfa"
                 },
@@ -327,11 +328,12 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
                     "numero": "12345",
                     "titolo": "Gestione chiavi univoche",
                     "progressivo": "0",
-                    "content": "Le chiavi univoche devono essere definite per ogni cliente per evitare conflitti.",
+                    "content": "Le chiavi univoche devono essere definite per ogni cliente per evitare conflitti, anche in personalizzazioni e plugin su richiesta del cliente.",
                     "autore": "Luca",
-                    "cliente": "Beta"}
+                    "cliente": "Beta"
+                }
             ],
-            "answer": "Per configurare i piani di consegna, impostare importazione e gestione dei dati [1]. Le chiavi univoche devono essere definite per ciascun cliente [2].\n\nDocumenti di riferimento:\n1. RI: [12121](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=12121) - Configurazione piani di consegna, Chunk: 5, Autore: Mario, Cliente: Alfa\n2. RI: [12345](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=12345) - Gestione chiavi univoche, Chunk: 1, Autore: Luca, Cliente: Beta"
+            "answer": "Per configurare i piani di consegna, definisci importazione e gestione dei dati nel modulo standard di **SAM ERP2** [1]. Le chiavi univoche devono essere definite per ciascun cliente, anche per eventuali plugin o personalizzazioni [2].\n\nDocumenti di riferimento:\n1. RI: [12121](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=12121) - Configurazione piani di consegna, Chunk: 5, Autore: Mario, Cliente: Alfa\n2. RI: [12345](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=12345) - Gestione chiavi univoche, Chunk: 1, Autore: Luca, Cliente: Beta"
         },
         {
             "user_prompt": "Come verificare i dati importati nel sistema?",
@@ -342,11 +344,13 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
                     "progressivo": "3",
                     "content": "Verificare che tutti i campi siano completi e corretti dopo l'importazione.",
                     "autore": "Anna",
-                    "cliente": "Gamma"}
+                    "cliente": "Gamma"
+                }
             ],
-            "answer": "Per verificare i dati importati, controllare che tutti i campi siano completi e corretti [1].\n\nDocumenti di riferimento:\n1. RI: [51000](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51000) - Controllo dati importati, Chunk: 4, Autore: Anna, Cliente: Gamma"
+            "answer": "Per verificare i dati importati nel modulo standard di **SAM ERP2**, controlla che tutti i campi siano completi e corretti [1].\n\nDocumenti di riferimento:\n1. RI: [51000](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51000) - Controllo dati importati, Chunk: 4, Autore: Anna, Cliente: Gamma"
         }
     ]
+
 
     few_shot_text = ""
     for ex in examples:
@@ -487,9 +491,15 @@ def summarize_old_messages(messages, max_tokens):
     if not messages:
         return ""
     
-    system_prompt = """Sei un assistente che deve riassumere i messaggi della chat
-                        in modo sintetico, mantenendo solo i concetti principali.
-                        Il riassunto deve essere chiaro, breve e utile al contesto"""
+    system_prompt = """
+    Sei un assistente che deve riassumere i messaggi della chat relativi al software gestionale SAM ERP2. 
+    Il riassunto deve essere chiaro, breve e utile al contesto, mantenendo solo i concetti principali. 
+
+    Criteri:
+    1. Mantieni nel riassunto le informazioni rilevanti per capire il contesto delle richieste, indicando chiaramente se riguardano funzionalità standard o plugin.
+    2. Sintetizza i concetti, rimuovendo dettagli ridondanti o non essenziali.
+    3. Il riassunto deve fornire un contesto sufficiente per permettere all'LLM di rispondere correttamente alle richieste successive.
+    """
 
     # Costruisci il testo
     text_to_summarize = ""

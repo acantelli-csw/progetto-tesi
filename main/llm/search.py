@@ -1,9 +1,8 @@
-import ast
 import json
 import os
 import sys
 import re
-import numpy as np
+from datetime import datetime
 from typing import List, Dict, Tuple
 from rank_bm25 import BM25Okapi
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -61,51 +60,67 @@ def semantic_search(prompt, top_n=10):
 
 def keyword_search(prompt) -> List[Dict]:
 
-    docs = load_documents_from_db()
-
-    bm25_index, doc_ids = build_bm25_index(docs)
-
+    bm25_index, doc_ids = get_bm25_index()
+    
+    # Carica solo i campi necessari
+    docs = load_documents_for_bm25()
     top_docs = get_top_documents(prompt, bm25_index, doc_ids, docs, top_k=3)
     
     if not top_docs:
-        print("Nessun risultato trovato\n")
-
+        print("Nessun risultato trovato dalla keyword search\n")
     return top_docs
 
 
-def load_documents_from_db() -> List[Dict]:
+def get_bm25_index():
+    """Restituisce l'indice BM25 cached o lo costruisce se necessario"""
+    global _bm25_cache
     
-    # Leggi tutti i documenti dal DB
+    # Controlla se l'indice è già presente
+    if _bm25_cache["index"] is not None:
+        return _bm25_cache["index"], _bm25_cache["doc_ids"]
+    
+    # Carica solo i campi necessari (senza embedding)
+    docs = load_documents_for_bm25()
+    bm25_index, doc_ids = build_bm25_index(docs)
+    
+    _bm25_cache["index"] = bm25_index
+    _bm25_cache["doc_ids"] = doc_ids
+    _bm25_cache["last_update"] = datetime.now()
+    
+    return bm25_index, doc_ids
+
+def load_documents_for_bm25() -> List[Dict]:
+    """Carica solo i campi necessari per BM25"""
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT ID, Content, NumRI, Progressivo, Titolo, Autore, Cliente, Embedding
+    SELECT ID, Content, NumRI, Progressivo, Titolo, Autore, Cliente
     FROM DocumentChunks
-    """)
+    """)  # Nota: NO Embedding!
+    
     rows = cursor.fetchall()
-    
-    docs = []
-    for row in rows:
-        doc_id, content, numero, progressivo, titolo, autore, cliente, embedding_raw = row
-        
-        # Parse embedding se necessario
-        if isinstance(embedding_raw, str):
-            embedding = np.array(ast.literal_eval(embedding_raw), dtype=float)
-        else:
-            embedding = embedding_raw
-        
-        docs.append({
-            "id": doc_id,
-            "content": content,
-            "numero": numero,
-            "progressivo": progressivo,
-            "titolo": titolo,
-            "autore": autore,
-            "cliente": cliente,
-            "embedding": embedding
-        })
-    
-    return docs
+    return [{"id": row[0], "content": row[1], "numero": row[2], 
+             "progressivo": row[3], "titolo": row[4], "autore": row[5], 
+             "cliente": row[6]} for row in rows]
+
+def build_bm25_index(docs: List[Dict]) -> Tuple[BM25Okapi, List[str]]:
+
+    doc_ids = [str(doc["id"]) for doc in docs]
+
+    # Tokenizza tutti i documenti rimuovendo stopwords italiane
+    tokenized_docs = [tokenize(doc["content"]) for doc in docs]
+
+    # Crea l'indice BM25
+    bm25_index = BM25Okapi(tokenized_docs)
+
+    return bm25_index, doc_ids
+
+def tokenize(text: str) -> List[str]:
+    text = text.lower()
+    tokens = re.findall(r'\b\w+\b', text)
+    # Rimuovi stopwords
+    tokens = [t for t in tokens if t not in ITALIAN_STOPWORDS]
+    return tokens
 
 
 def get_top_documents(
@@ -128,7 +143,6 @@ def get_top_documents(
         top_docs.append(doc)
     
     return top_docs
-
 
 def search_bm25(
     query: str,
@@ -156,25 +170,12 @@ def search_bm25(
     return ranked_docs[:top_k]
 
 
-def build_bm25_index(docs: List[Dict]) -> Tuple[BM25Okapi, List[str]]:
-
-    doc_ids = [str(doc["id"]) for doc in docs]
-    
-    # Tokenizza tutti i documenti rimuovendo stopwords italiane
-    tokenized_docs = [tokenize(doc["content"]) for doc in docs]
-    
-    # Crea l'indice BM25
-    bm25_index = BM25Okapi(tokenized_docs)
-    
-    return bm25_index, doc_ids
-
-def tokenize(text: str) -> List[str]:
-    text = text.lower()
-    tokens = re.findall(r'\b\w+\b', text)
-    # Rimuovi stopwords
-    tokens = [t for t in tokens if t not in ITALIAN_STOPWORDS]
-    return tokens
-
+# Variabile globale cache indice BM25
+_bm25_cache = {
+    "index": None,
+    "doc_ids": None,
+    "last_update": None
+}
 
 ITALIAN_STOPWORDS = {
     'a', 'adesso', 'ai', 'al', 'alla', 'allo', 'allora', 'altre', 'altri', 'altro',
