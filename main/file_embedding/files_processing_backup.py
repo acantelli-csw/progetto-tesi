@@ -4,9 +4,6 @@ import db_connection
 import embedding
 import json
 import easyocr
-import os
-import bm25s
-import nltk
 
 # Configura il text splitter per il chunking
 chunk_size = 1000
@@ -43,10 +40,8 @@ ORDER BY Numero;
 """
 
 cursor.execute(query)
-rows = cursor.fetchall()
 
-corpus = []
-chunk_records = []
+rows = cursor.fetchall()
 
 # Elaborazione file estratti
 for row in rows:
@@ -63,61 +58,28 @@ for row in rows:
     chunks = splitter.split_text(text)
 
     # ========== EMBEDDINGS ==========
-    # Calcolo embedding per ogni chunk
+    # Calcolo e salvataggio su DB degli embedding per ogni chunk
+    chunk_records = []
     for i, chunk in enumerate(chunks):
         emb = embedding.get_embedding(chunk)
         emb_json = json.dumps(emb)
         chunk_records.append((numero, i, titolo, cliente, autore, chunk, emb_json))
-        corpus.append(chunk)
 
-    cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'elaborato' AND InstanceID = ?", (instance_id))
-    print(f"Embedding creati per file: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40}.\n")
 
-# Salvataggio di tutti i chunk in un'unica query per maggior efficienza
-if chunk_records:
+    # Salvataggio di tutti i chunk in un'unica query per maggior efficienza
     cursor.executemany(
         "INSERT INTO DocumentChunks (NumRI, Progressivo, TitoloRI, Cliente, Autore, Content, Embedding)" \
         "VALUES (?, ?, ?, ?, ?, ?, CAST(CAST(? AS VARCHAR(MAX)) AS VECTOR(1536)))", 
         chunk_records
     )
-    conn.commit()
     
-# ========== INDEXING BM25 ==========
-if corpus:
-    print(f"\n{'-'*40}\nCreazione indice BM25 per {len(corpus)} chunk...")
-    
-    # Importa direttamente gli strumenti NLTK
-    from nltk.stem.snowball import SnowballStemmer
-    from nltk.corpus import stopwords
+    # ========== INDEXING ==========
+    # Per ora costruzione dinamica durante la search
 
-    # Configura stemmer e stopwords per italiano
-    language = 'italian'  # o 'english' se necessario
-    stemmer = SnowballStemmer(language)
-    stop_words = stopwords.words(language)
-    
-    # Tokenizzazione con stemmer
-    corpus_tokens = bm25s.tokenize(
-        corpus, 
-        stopwords=stop_words, 
-        stemmer=stemmer.stem
-    )
-    
-    # Creazione e indicizzazione BM25
-    retriever = bm25s.BM25()
-    retriever.index(corpus_tokens)
-    
-    # Salvataggio dell'indice in locale
-    index_folder = "reverse_index"
-    os.makedirs(index_folder, exist_ok=True)
-    index_path = os.path.join(index_folder, "bm25_index")
-    retriever.save(index_path)
-    
-    print(f"Indice BM25 creato e salvato in '{index_path}'")
-    print(f"Documenti indicizzati: {len(corpus)}")
-    print(f"Token unici nel vocabolario: {len(corpus_tokens.vocab)}")
-else:
-    print("Nessun chunk da indicizzare.")
+    cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'elaborato' AND InstanceID = ?", (instance_id))
+    conn.commit()
+    print(f"File processato: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40} , Indici inversi creati.\n")
 
 cursor.close()
 conn.close()
-print(f"\n{'-'*40}\nTutti i file sono stati processati!")
+print("Tutti i file sono stati processati!")
