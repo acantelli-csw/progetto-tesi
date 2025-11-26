@@ -4,10 +4,18 @@ from docx import Document
 import numpy as np
 import tempfile
 import os
+import re
 import fitz  
 import win32com.client as win32
 
-# Estrai testo e immagini dai documenti in base all'estensione
+# Pulizia parti inutili del testo prima del chunking
+def remove_placeholders(text: str) -> str:
+    # Regex che elimina blocchi tipo [N.B. .... ] – -- -- testo da cancellare
+    pattern = r"\[\s*N\.?B\.?.*?\]\s*[-–—\s]*"
+    return re.sub(pattern, "", text, flags=re.IGNORECASE | re.DOTALL)
+
+
+# Estrazione testo e trascrizione immagini dai documenti in base all'estensione
 def extract_text_from_varbinary(file_data, extension, numero, reader):
 
     ext = extension.lower()
@@ -136,6 +144,7 @@ def extract_text_from_varbinary(file_data, extension, numero, reader):
 
         # Pulizia testo
         full_text = full_text.strip().replace("\x0c", "")
+        full_text = remove_placeholders(full_text)
         return full_text
 
     except Exception as e:

@@ -1,4 +1,5 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import TokenTextSplitter
 import extract_text
 import db_connection
 import embedding
@@ -10,9 +11,9 @@ from nltk.corpus import stopwords
 import bm25s
 
 # Configura il text splitter per il chunking
-chunk_size = 1000
-chunk_overlap = 150
-splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+chunk_size = 512
+chunk_overlap = 100
+splitter = TokenTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
 
 # Inizializza il reader OCR una volta sola
 reader = easyocr.Reader(['it', 'en'], gpu=False)
@@ -54,13 +55,12 @@ for row in rows:
 
     instance_id, cliente, numero, titolo, autore, file_data, extension = row
 
-    # Estrazione testo + OCR immagini interne
+    # Estrazione testo + OCR immagini
     text = extract_text.extract_text_from_varbinary(file_data, extension, numero, reader)
     if not text.strip():
         print(f"Nessun testo estratto dal file {numero}{extension}, salto il file.")
         continue
 
-    # Suddivisione in chunk
     chunks = splitter.split_text(text)
 
     # ========== EMBEDDINGS ==========

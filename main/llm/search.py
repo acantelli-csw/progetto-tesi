@@ -1,10 +1,6 @@
 import json
 import os
 import sys
-import re
-from datetime import datetime
-from typing import List, Dict, Tuple
-from rank_bm25 import BM25Okapi
 import bm25s
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
