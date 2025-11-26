@@ -5,8 +5,9 @@ import embedding
 import json
 import easyocr
 import os
+from nltk.stem.snowball import SnowballStemmer
+from nltk.corpus import stopwords
 import bm25s
-import nltk
 
 # Configura il text splitter per il chunking
 chunk_size = 1000
@@ -85,13 +86,8 @@ if chunk_records:
 # ========== INDEXING BM25 ==========
 if corpus:
     print(f"\n{'-'*40}\nCreazione indice BM25 per {len(corpus)} chunk...")
-    
-    # Importa direttamente gli strumenti NLTK
-    from nltk.stem.snowball import SnowballStemmer
-    from nltk.corpus import stopwords
 
-    # Configura stemmer e stopwords per italiano
-    language = 'italian'  # o 'english' se necessario
+    language = 'italian'
     stemmer = SnowballStemmer(language)
     stop_words = stopwords.words(language)
     

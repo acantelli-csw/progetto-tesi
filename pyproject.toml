@@ -22,7 +22,9 @@ dependencies = [
     "PyMuPDF",
     "streamlit",
     "rank_bm25",
-    "pywin32"
+    "pywin32",
+    "bm25s",
+    "nltk"
 ]
 
 [build-system]
