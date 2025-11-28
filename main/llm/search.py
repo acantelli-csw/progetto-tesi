@@ -4,12 +4,13 @@ import sys
 import bm25s
 from nltk.stem.snowball import SnowballStemmer
 from nltk.corpus import stopwords
+import nltk
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from file_embedding.db_connection import get_connection
 from file_embedding.embedding import get_embedding
+nltk.download('stopwords')
 
 def semantic_search(prompt, top_n=10):
-
     prompt_embedding = get_embedding(prompt)
     prompt_embedding_json = json.dumps(prompt_embedding)
 
@@ -31,11 +32,8 @@ def semantic_search(prompt, top_n=10):
             ORDER BY Similarity DESC;
         """
 
-    conn = get_connection()
-    cursor = conn.cursor()
-
+    cursor = get_connection().cursor()
     cursor.execute(query, (top_n,))
-
     rows = cursor.fetchall()
 
     docs = []
@@ -53,12 +51,17 @@ def semantic_search(prompt, top_n=10):
             "embedding": embedding_raw,
             "similarity": similarity
         })
-
     return docs
 
 
 def keyword_search(prompt, top_n = 10, language = 'italian'):
+    
     stemmer = SnowballStemmer(language)
+    try:
+        nltk.data.find(f'corpora/stopwords')
+    except LookupError:
+        print("Stopwords non trovate, scarico il pacchetto...")
+        nltk.download('stopwords')
     stop_words = stopwords.words(language)
 
     # Carica l'indice BM25

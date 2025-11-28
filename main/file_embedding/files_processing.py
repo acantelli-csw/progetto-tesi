@@ -24,11 +24,13 @@ cursor = conn.cursor()
 
 # Query per ottenere i file da processare e le loro variabili associate
 query = """
-SELECT v.InstanceID,
-    MAX(CASE WHEN v.VariableName = 'cliente' THEN v.StringValue END) AS Cliente,
-    MAX(CASE WHEN v.VariableName = 'numero' THEN v.StringValue END) AS Numero,
-    MAX(CASE WHEN v.VariableName = 'titolo' THEN v.StringValue END) AS Titolo,
-    MAX(CASE WHEN v.VariableName = 'autore' THEN v.StringValue END) AS Autore,
+SELECT top 3 v.InstanceID,
+    MAX(CASE WHEN v.VariableName = 'NUMERO' THEN v.StringValue END) AS numero,
+    MAX(CASE WHEN v.VariableName = 'CLIENTE' THEN v.StringValue END) AS cliente,
+    MAX(CASE WHEN v.VariableName = 'TITOLO' THEN v.StringValue END) AS titolo,
+    MAX(CASE WHEN v.VariableName = 'AUTORE' THEN v.StringValue END) AS autore,
+    MAX(CASE WHEN v.VariableName = 'DOCUMENTO' THEN v.StringValue END) AS documento,
+    MAX(CASE WHEN v.VariableName = 'URL_DOC' THEN v.StringValue END) AS url_doc,
     MAX(f.FileData) AS FileData,
     MAX(f.Extension) AS Extension
 FROM VAR_RICSW v 
@@ -41,7 +43,7 @@ WHERE v.InstanceID IN (
         AND v2.BooleanValue = 0
   )
 GROUP BY v.InstanceID
-ORDER BY Numero;
+ORDER BY v.InstanceID;
 """
 
 cursor.execute(query)
@@ -73,7 +75,10 @@ for row in rows:
 
     cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'elaborato' AND InstanceID = ?", (instance_id))
     print(f"Embedding creati per file: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40}.\n")
+    conn.commit()
 
+# TODO fix this, ora come ora salva solo alla fine ma c'è il rischio che se salta non salvi niente, 
+# meglio committare ogni volta, meno efficeitne ma piu sicuro
 # Salvataggio di tutti i chunk in un'unica query per maggior efficienza
 if chunk_records:
     cursor.executemany(
