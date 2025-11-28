@@ -39,7 +39,7 @@ JOIN DocumentFiles f
 WHERE v.InstanceID IN (
     SELECT v2.InstanceID
     FROM VAR_RICSW v2
-    WHERE v2.VariableName = 'elaborato'
+    WHERE v2.VariableName = 'ELABORATO'
         AND v2.BooleanValue = 0
   )
 GROUP BY v.InstanceID
@@ -50,12 +50,11 @@ cursor.execute(query)
 rows = cursor.fetchall()
 
 corpus = []
-chunk_records = []
 
 # Elaborazione file estratti
 for row in rows:
-
-    instance_id, cliente, numero, titolo, autore, file_data, extension = row
+    chunk_records = []
+    instance_id, numero, cliente, titolo, autore, documento, url_doc, file_data, extension = row
 
     # Estrazione testo + OCR immagini
     text = extract_text.extract_text_from_varbinary(file_data, extension, numero, reader)
@@ -70,23 +69,20 @@ for row in rows:
     for i, chunk in enumerate(chunks):
         emb = embedding.get_embedding(chunk)
         emb_json = json.dumps(emb)
-        chunk_records.append((numero, i, titolo, cliente, autore, chunk, emb_json))
+        chunk_records.append((numero, i, cliente, titolo, autore, documento, url_doc, chunk, emb_json))
         corpus.append(chunk)
 
-    cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'elaborato' AND InstanceID = ?", (instance_id))
+    cursor.execute("UPDATE VAR_RICSW SET BooleanValue = 1 WHERE VariableName = 'ELABORATO' AND InstanceID = ?", (instance_id))
+    # Salvataggio di tutti i chunk di un documento in un'unica query per maggior efficienza
+    if chunk_records:
+        cursor.executemany(
+            "INSERT INTO DocumentChunks (NumRI, Progressivo, Cliente, Titolo, Autore, Doc, Url_doc, Content, Embedding)" \
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CAST(CAST(? AS VARCHAR(MAX)) AS VECTOR(1536)))", 
+            chunk_records
+        )
+    conn.commit()
     print(f"Embedding creati per file: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40}.\n")
-    conn.commit()
 
-# TODO fix this, ora come ora salva solo alla fine ma c'è il rischio che se salta non salvi niente, 
-# meglio committare ogni volta, meno efficeitne ma piu sicuro
-# Salvataggio di tutti i chunk in un'unica query per maggior efficienza
-if chunk_records:
-    cursor.executemany(
-        "INSERT INTO DocumentChunks (NumRI, Progressivo, TitoloRI, Cliente, Autore, Content, Embedding)" \
-        "VALUES (?, ?, ?, ?, ?, ?, CAST(CAST(? AS VARCHAR(MAX)) AS VECTOR(1536)))", 
-        chunk_records
-    )
-    conn.commit()
     
 # ========== INDEXING BM25 ==========
 if corpus:

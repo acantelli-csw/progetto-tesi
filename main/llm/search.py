@@ -20,12 +20,14 @@ def semantic_search(prompt, top_n=10):
 
             SELECT TOP (?)
                 ID,
-                Content,
                 NumRI,
                 Progressivo,
                 Titolo,
-                Autore,
                 Cliente,
+                Autore,
+                Documento,
+                Url_doc,
+                Content,
                 Embedding,
                 1 - VECTOR_DISTANCE('cosine', Embedding, @prompt) AS Similarity
             FROM DocumentChunks
@@ -38,23 +40,26 @@ def semantic_search(prompt, top_n=10):
 
     docs = []
     for row in rows:
-        doc_id, content, numero, progressivo, titolo, autore, cliente, embedding_raw, similarity = row
+        doc_id, numero, progressivo, titolo, cliente, autore, documento, url_doc, content, embedding, similarity = row
 
         docs.append({
             "id": doc_id,
-            "content": content,
             "numero": numero,
             "progressivo": progressivo,
             "titolo": titolo,
-            "autore": autore,
             "cliente": cliente,
-            "embedding": embedding_raw,
+            "autore": autore,
+            "documento": documento,
+            "autore": autore,
+            "url_doc": url_doc,
+            "content": content,
+            "embedding": embedding,
             "similarity": similarity
         })
     return docs
 
 
-def keyword_search(prompt, top_n = 10, language = 'italian'):
+def keyword_search(prompt, top_n=10, language='italian'):
     
     stemmer = SnowballStemmer(language)
     try:
