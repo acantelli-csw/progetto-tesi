@@ -22,8 +22,8 @@ def semantic_search(prompt, top_n=10):
                 ID,
                 NumRI,
                 Progressivo,
-                Titolo,
                 Cliente,
+                Titolo,
                 Autore,
                 Documento,
                 Url_doc,
@@ -40,14 +40,14 @@ def semantic_search(prompt, top_n=10):
 
     docs = []
     for row in rows:
-        doc_id, numero, progressivo, titolo, cliente, autore, documento, url_doc, content, embedding, similarity = row
+        doc_id, numero, progressivo, cliente, titolo, autore, documento, url_doc, content, embedding, similarity = row
 
         docs.append({
             "id": doc_id,
             "numero": numero,
             "progressivo": progressivo,
-            "titolo": titolo,
             "cliente": cliente,
+            "titolo": titolo,
             "autore": autore,
             "documento": documento,
             "autore": autore,
@@ -75,21 +75,47 @@ def keyword_search(prompt, top_n=10, language='italian'):
     retriever = bm25s.BM25.load(index_path, load_corpus=False)
     
     # Tokenizza la query
-    query_tokens = bm25s.tokenize(prompt, stopwords=stop_words, stemmer=stemmer.stem)
+    query_tokens = bm25s.tokenize(prompt, stopwords=stop_words, stemmer=lambda tokens: [stemmer.stem(t.lower()) for t in tokens])
     
     # Limita i risultati
     num_docs = retriever.scores["num_docs"]
     k = min(top_n, num_docs)
     results, scores = retriever.retrieve(query_tokens, k=k)
     
-    # Prepara i risultati: gli indici corrispondono alle posizioni nel corpus originale
-    search_results = []
+    # Estrai i chunk cercati e i relativi metadati sfruttando gli indici
+    docs = []
     for idx, score in zip(results.flatten(), scores.flatten()):
-        if score > 0.0:  # Filtra risultati con score nullo
-            search_results.append({
-                'chunk_index': int(idx),
-                'score': float(score)
-            })
-    
-    print(f"Ricerca BM25 completata: {len(search_results)} risultati trovati")
-    return search_results
+        if score > 0.0:
+
+            cursor = get_connection().cursor()
+            cursor.execute("""
+                SELECT 
+                    id, NumRI, progressivo, cliente, titolo, autore,
+                    documento, url_doc, content, embedding
+                FROM DocumentChunks 
+                WHERE id = ?
+            """, (int(idx),))
+            
+            row = cursor.fetchone()
+            cursor.close()
+
+            if row:
+                (doc_id, numero, progressivo, cliente, titolo, autore,
+                 documento, url_doc, content, embedding) = row
+
+                docs.append({
+                    "id": doc_id,
+                    "numero": numero,
+                    "progressivo": progressivo,
+                    "cliente": cliente,
+                    "titolo": titolo,
+                    "autore": autore,
+                    "documento": documento,
+                    "url_doc": url_doc,
+                    "content": content,
+                    "embedding": embedding,
+                    "score": float(score)
+                })
+
+    print(f"Ricerca BM25 completata: {len(docs)} risultati trovati")
+    return docs

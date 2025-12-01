@@ -132,8 +132,9 @@ def select_documents(user_prompt: str, documents: list) -> dict:
     utente e coerenti con essa nello specifico, distinguendo tra funzionalità standard e plugin/customizzazioni. 
 
     Nota:
-    - La ricerca documentale restituisce sempre i top 10 documenti più rilevanti, ma non tutti sono effettivamente utili.
-    - Per ciascun documento è disponibile il contenuto e il valore di similarità coseno con il prompt utente. 
+    - La ricerca documentale restituisce sempre i top 25 documenti più rilevanti, ma non tutti sono effettivamente utili.
+    - Seleziona un massimo di 20 documenti rilevanti, dando precedenza a quelli più coerenti con la richiesta dell'utente.
+    - Per ciascun documento è disponibile il contenuto e il valore di similarità coseno con il prompt utente.
     Usa queste informazioni come guida, ma valuta anche il contenuto reale in termini di utilità per la risposta e la coerenza con la domanda.
 
     Criteri di rilevanza:
@@ -414,7 +415,7 @@ def gpt_request(messages):
     all_documents = []
     if tools["use_semantic"]:
         print("\nUso la ricerca SEMANTICA\n")
-        all_documents = search.semantic_search(user_prompt)
+        all_documents += search.semantic_search(user_prompt)
 
     if tools["use_keyword"]:
         print("\nUso la ricerca per KEYWORDS\n")

@@ -16,3 +16,4 @@ uv.lock
 # User credentials and chat histories
 chat_history
 users.json
+reverse_index/*

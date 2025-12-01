@@ -24,12 +24,13 @@ cursor = conn.cursor()
 
 # Query per ottenere i file da processare e le loro variabili associate
 query = """
-SELECT top 3 v.InstanceID,
+SELECT top 3
+    v.InstanceID,
     MAX(CASE WHEN v.VariableName = 'NUMERO' THEN v.StringValue END) AS numero,
     MAX(CASE WHEN v.VariableName = 'CLIENTE' THEN v.StringValue END) AS cliente,
     MAX(CASE WHEN v.VariableName = 'TITOLO' THEN v.StringValue END) AS titolo,
     MAX(CASE WHEN v.VariableName = 'AUTORE' THEN v.StringValue END) AS autore,
-    MAX(CASE WHEN v.VariableName = 'DOCUMENTO' THEN v.StringValue END) AS documento,
+    MAX(CASE WHEN v.VariableName = 'DOC' THEN v.StringValue END) AS documento,
     MAX(CASE WHEN v.VariableName = 'URL_DOC' THEN v.StringValue END) AS url_doc,
     MAX(f.FileData) AS FileData,
     MAX(f.Extension) AS Extension
@@ -43,7 +44,7 @@ WHERE v.InstanceID IN (
         AND v2.BooleanValue = 0
   )
 GROUP BY v.InstanceID
-ORDER BY v.InstanceID;
+ORDER BY numero desc;
 """
 
 cursor.execute(query)
@@ -76,45 +77,46 @@ for row in rows:
     # Salvataggio di tutti i chunk di un documento in un'unica query per maggior efficienza
     if chunk_records:
         cursor.executemany(
-            "INSERT INTO DocumentChunks (NumRI, Progressivo, Cliente, Titolo, Autore, Doc, Url_doc, Content, Embedding)" \
+            "INSERT INTO DocumentChunks (NumRI, Progressivo, Cliente, Titolo, Autore, Documento, Url_doc, Content, Embedding)" \
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CAST(CAST(? AS VARCHAR(MAX)) AS VECTOR(1536)))", 
             chunk_records
         )
     conn.commit()
     print(f"Embedding creati per file: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40}.\n")
 
-    
-# ========== INDEXING BM25 ==========
-if corpus:
-    print(f"\n{'-'*40}\nCreazione indice BM25 per {len(corpus)} chunk...")
 
-    language = 'italian'
-    stemmer = SnowballStemmer(language)
-    stop_words = stopwords.words(language)
-    
-    # Tokenizzazione con stemmer
-    corpus_tokens = bm25s.tokenize(
-        corpus, 
-        stopwords=stop_words, 
-        stemmer=stemmer.stem
+# ========== INDEXING BM25 ==========
+print(f"\n{'-'*40}\nRicostruzione completa indice BM25...")
+
+language = 'italian'
+stemmer = SnowballStemmer(language)
+stop_words = stopwords.words(language)
+
+# ---- Carica TUTTI i chunk dal DB ----
+cursor = conn.cursor()
+cursor.execute("SELECT Content FROM DocumentChunks")
+all_chunks = [row[0] for row in cursor.fetchall()]
+
+print(f"Totale chunk nel DB: {len(all_chunks)}")
+
+if not all_chunks:
+    print("Nessun chunk presente nel DB. Indice non creato.")
+else:
+    all_tokens = bm25s.tokenize(
+        all_chunks,
+        stopwords=stop_words,
+        stemmer=lambda tokens: [stemmer.stem(t.lower()) for t in tokens]
     )
-    
-    # Creazione e indicizzazione BM25
+
+    # ---- Creazione e salvataggio reverse index ----
     retriever = bm25s.BM25()
-    retriever.index(corpus_tokens)
-    
-    # Salvataggio dell'indice in locale
+    retriever.index(all_tokens)
+
     index_folder = "reverse_index"
     os.makedirs(index_folder, exist_ok=True)
     index_path = os.path.join(index_folder, "bm25_index")
     retriever.save(index_path)
-    
-    print(f"Indice BM25 creato e salvato in '{index_path}'")
-    print(f"Documenti indicizzati: {len(corpus)}")
-    print(f"Token unici nel vocabolario: {len(corpus_tokens.vocab)}")
-else:
-    print("Nessun chunk da indicizzare.")
 
-cursor.close()
-conn.close()
-print(f"\n{'-'*40}\nTutti i file sono stati processati!")
+    print(f"Documenti indicizzati: {len(retriever.corpus)}")
+    print(f"Token unici nel vocabolario: {len(retriever.vocab)}")
+

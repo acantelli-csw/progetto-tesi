@@ -12,19 +12,23 @@ dependencies = [
     "langchain-community",
     "langchain-openai",
     "pyodbc",
-    "pandas",
+    "pandas==2.3.3",              
     "python-dotenv",
     "tqdm",
     "easyocr",
     "pillow",
     "python-docx",
-    "textract",
     "PyMuPDF",
     "streamlit",
+    "python-dateutil==2.8.2",
     "rank_bm25",
     "pywin32",
     "bm25s",
-    "nltk"
+    "nltk",
+    "ragas",
+    "datasets==2.19.1",
+    "llama_index",
+    "six==1.16.0"       
 ]
 
 [build-system]
