@@ -60,62 +60,75 @@ def semantic_search(prompt, top_n=10):
 
 
 def keyword_search(prompt, top_n=10, language='italian'):
-    
+
+    # Setup stemmer e stopwords
     stemmer = SnowballStemmer(language)
     try:
-        nltk.data.find(f'corpora/stopwords')
+        nltk.data.find('corpora/stopwords')
     except LookupError:
         print("Stopwords non trovate, scarico il pacchetto...")
         nltk.download('stopwords')
     stop_words = stopwords.words(language)
 
-    # Carica l'indice BM25
+    # Tokenizzazione query
+    query_tokens = bm25s.tokenize(
+        prompt,
+        stopwords=stop_words,
+        stemmer=lambda tokens: [stemmer.stem(t.lower()) for t in tokens]
+    )
+
+    # Carica indice BM25
     index_folder = "reverse_index"
     index_path = os.path.join(index_folder, "bm25_index")
-    retriever = bm25s.BM25.load(index_path, load_corpus=False)
-    
-    # Tokenizza la query
-    query_tokens = bm25s.tokenize(prompt, stopwords=stop_words, stemmer=lambda tokens: [stemmer.stem(t.lower()) for t in tokens])
-    
-    # Limita i risultati
-    num_docs = retriever.scores["num_docs"]
+    retriever = bm25s.BM25.load(index_path, load_corpus=True)
+
+    # Numero di documenti 
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM DocumentChunks")
+    num_docs = cursor.fetchone()[0]
+    cursor.close()
+
     k = min(top_n, num_docs)
+
+    # Recupera risultati BM25
     results, scores = retriever.retrieve(query_tokens, k=k)
-    
-    # Estrai i chunk cercati e i relativi metadati sfruttando gli indici
+
+    # Estrai chunk e metadati dal DB
     docs = []
+    cursor = conn.cursor()
     for idx, score in zip(results.flatten(), scores.flatten()):
-        if score > 0.0:
+        if score <= 0:
+            continue
 
-            cursor = get_connection().cursor()
-            cursor.execute("""
-                SELECT 
-                    id, NumRI, progressivo, cliente, titolo, autore,
-                    documento, url_doc, content, embedding
-                FROM DocumentChunks 
-                WHERE id = ?
-            """, (int(idx),))
-            
-            row = cursor.fetchone()
-            cursor.close()
+        cursor.execute("""
+            SELECT 
+                id, NumRI, progressivo, cliente, titolo, autore,
+                documento, url_doc, content, embedding
+            FROM DocumentChunks 
+            WHERE bm25_index = ?
+        """, (int(idx),))
+        row = cursor.fetchone()
+        if not row:
+            continue
 
-            if row:
-                (doc_id, numero, progressivo, cliente, titolo, autore,
-                 documento, url_doc, content, embedding) = row
+        (doc_id, numero, progressivo, cliente, titolo, autore,
+            documento, url_doc, content, embedding) = row
 
-                docs.append({
-                    "id": doc_id,
-                    "numero": numero,
-                    "progressivo": progressivo,
-                    "cliente": cliente,
-                    "titolo": titolo,
-                    "autore": autore,
-                    "documento": documento,
-                    "url_doc": url_doc,
-                    "content": content,
-                    "embedding": embedding,
-                    "score": float(score)
-                })
-
-    print(f"Ricerca BM25 completata: {len(docs)} risultati trovati")
+        docs.append({
+            "id": doc_id,
+            "numero": numero,
+            "progressivo": progressivo,
+            "cliente": cliente,
+            "titolo": titolo,
+            "autore": autore,
+            "documento": documento,
+            "url_doc": url_doc,
+            "content": content,
+            "embedding": embedding,
+            "score": float(score)
+        })        
+        
+    cursor.close()
+    print(f"\nRicerca BM25 completata: {len(docs)} risultati trovati")
     return docs

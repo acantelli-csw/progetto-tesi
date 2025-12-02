@@ -24,7 +24,7 @@ cursor = conn.cursor()
 
 # Query per ottenere i file da processare e le loro variabili associate
 query = """
-SELECT top 3
+SELECT top 10
     v.InstanceID,
     MAX(CASE WHEN v.VariableName = 'NUMERO' THEN v.StringValue END) AS numero,
     MAX(CASE WHEN v.VariableName = 'CLIENTE' THEN v.StringValue END) AS cliente,
@@ -82,41 +82,47 @@ for row in rows:
             chunk_records
         )
     conn.commit()
-    print(f"Embedding creati per file: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40}.\n")
+    print(f"Embedding creati per file: {numero}{extension} ,\t{len(chunks)} chunk generati\n{'-'*40}\n")
 
 
 # ========== INDEXING BM25 ==========
-print(f"\n{'-'*40}\nRicostruzione completa indice BM25...")
+print(f"\nRicostruzione completa indice BM25...")
 
+# Carica chunk con ID dal DB
+conn = db_connection.get_connection()
+cursor = conn.cursor()
+cursor.execute("SELECT id, Content FROM DocumentChunks ORDER BY id ASC")
+rows = cursor.fetchall()
+db_ids = [row[0] for row in rows]
+all_chunks = [row[1] for row in rows]
+
+# Tokenizzazione
 language = 'italian'
 stemmer = SnowballStemmer(language)
 stop_words = stopwords.words(language)
+all_tokens = bm25s.tokenize(
+    all_chunks,
+    stopwords=stop_words,
+    stemmer=lambda tokens: [stemmer.stem(t.lower()) for t in tokens]
+)
 
-# ---- Carica TUTTI i chunk dal DB ----
-cursor = conn.cursor()
-cursor.execute("SELECT Content FROM DocumentChunks")
-all_chunks = [row[0] for row in cursor.fetchall()]
+# Creazione e salvataggio reverse index BM25
+retriever = bm25s.BM25()
+retriever.index(all_tokens)
 
-print(f"Totale chunk nel DB: {len(all_chunks)}")
+index_folder = "reverse_index"
+os.makedirs(index_folder, exist_ok=True)
+index_path = os.path.join(index_folder, "bm25_index")
+retriever.save(index_path)
 
-if not all_chunks:
-    print("Nessun chunk presente nel DB. Indice non creato.")
-else:
-    all_tokens = bm25s.tokenize(
-        all_chunks,
-        stopwords=stop_words,
-        stemmer=lambda tokens: [stemmer.stem(t.lower()) for t in tokens]
-    )
+# Aggiorna mapping nel DB
+for pos, db_id in enumerate(db_ids):
+    cursor.execute("""
+        UPDATE DocumentChunks
+        SET Bm25_index = ?
+        WHERE id = ?
+    """, (pos, db_id))
 
-    # ---- Creazione e salvataggio reverse index ----
-    retriever = bm25s.BM25()
-    retriever.index(all_tokens)
-
-    index_folder = "reverse_index"
-    os.makedirs(index_folder, exist_ok=True)
-    index_path = os.path.join(index_folder, "bm25_index")
-    retriever.save(index_path)
-
-    print(f"Documenti indicizzati: {len(retriever.corpus)}")
-    print(f"Token unici nel vocabolario: {len(retriever.vocab)}")
-
+conn.commit()
+cursor.close()
+print(f"Indice BM25 creato per {len(all_chunks)} documenti.")
