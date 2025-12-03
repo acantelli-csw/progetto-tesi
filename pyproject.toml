@@ -28,7 +28,8 @@ dependencies = [
     "ragas",
     "datasets==2.19.1",
     "llama_index",
-    "six==1.16.0"       
+    "six==1.16.0",
+    "rapidfuzz"       
 ]
 
 [build-system]
