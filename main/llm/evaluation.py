@@ -1,17 +1,19 @@
 import sys
 import os
 import json
+from dotenv import load_dotenv
+
+# Carica le variabili d'ambiente
+load_dotenv()
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from file_embedding.db_connection import get_connection
-import search
-import llm
-
-# Import corretti per Ragas
 from ragas.testset import TestsetGenerator
 from ragas.embeddings import LangchainEmbeddingsWrapper
-from ragas.testset.graph import KnowledgeGraph, Node
+from ragas.llms import LangchainLLMWrapper
 from langchain_core.documents import Document
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings  # ✅ Usa Azure
+from llama_index.core.schema import Document as LlamaDocument
 
 def load_all_docs():
     """Carica tutti i documenti dal database e li converte in formato Ragas"""
@@ -26,7 +28,7 @@ def load_all_docs():
     for row in rows:
         doc_id, numero, progressivo, cliente, titolo, autore, documento, url_doc, content = row
         
-        # Crea un Document di LangChain (formato richiesto da Ragas)
+        # Crea un Document di LangChain
         doc = Document(
             page_content=content,
             metadata={
@@ -44,151 +46,87 @@ def load_all_docs():
     
     return documents
 
-def create_custom_retriever(retrieve_function):
+def generate_testset(n_samples=5, output_file="testset_ragas.json", use_custom_retriever=False):
     """
-    Wrapper per adattare la tua funzione di retrieval al formato Ragas.
-    Ragas si aspetta un callable che accetta una query string e ritorna lista di Document.
-    """
-    def wrapped_retriever(query: str) -> list[Document]:
-        # Usa la tua logica di retrieval
-        selected_docs = retrieve_function(query)
-        
-        # Converti i tuoi documenti in formato Document se necessario
-        langchain_docs = []
-        for doc in selected_docs:
-            if isinstance(doc, Document):
-                langchain_docs.append(doc)
-            elif isinstance(doc, dict):
-                # Se sono dizionari, convertili
-                content = doc.get("content", "")
-                metadata = {k: v for k, v in doc.items() if k != "content"}
-                langchain_docs.append(Document(page_content=content, metadata=metadata))
-            else:
-                print(f"Formato documento non riconosciuto: {type(doc)}")
-        
-        return langchain_docs
-    
-    return wrapped_retriever
-
-def retrieve_fn(user_prompt: str):
-    """Funzione di retrieval personalizzata"""
-    # 1 - Decisione strumenti
-    tools = llm.decide_tools(user_prompt)
-
-    # 2 - Recupero documenti
-    all_documents = []
-    if tools["use_semantic"]:
-        print("\nUso la ricerca SEMANTICA")
-        all_documents += search.semantic_search(user_prompt, 25)
-
-    if tools["use_keyword"]:
-        print("\nUso la ricerca per KEYWORDS")
-        all_documents += search.keyword_search(user_prompt, 25)
-
-    # 3 - Selezione documenti in base alla coerenza
-    selected_docs = []
-    if tools["use_semantic"] or tools["use_keyword"]:
-        if all_documents:
-            document_selection = llm.select_documents(user_prompt, all_documents)
-            # Selezione documenti rilevanti
-            selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
-    
-    return selected_docs
-
-def enrich_testset_with_retriever(testset, retriever_fn):
-    """
-    Arricchisce il testset usando il tuo retriever custom.
-    Per ogni domanda generata, recupera i documenti che il TUO sistema recupererebbe.
-    Questo ti permette di valutare quanto bene il tuo retriever funziona.
-    """
-    enriched_examples = []
-    
-    testset_dict = testset.to_dict()
-    examples = testset_dict.get('examples', [])
-    
-    for i, example in enumerate(examples):
-        question = example.get('question', '')
-        
-        if question:
-            print(f"  Processing {i+1}/{len(examples)}: {question[:60]}...")
-            
-            # Usa il TUO retriever per recuperare documenti
-            try:
-                retrieved_docs = retriever_fn(question)
-                
-                # Aggiungi i documenti recuperati all'esempio
-                example['retrieved_contexts'] = [
-                    doc.page_content if hasattr(doc, 'page_content') else str(doc)
-                    for doc in retrieved_docs
-                ]
-                example['retrieved_count'] = len(retrieved_docs)
-                
-            except Exception as e:
-                print(f"    ⚠️ Errore nel retrieval: {e}")
-                example['retrieved_contexts'] = []
-                example['retrieved_count'] = 0
-        
-        enriched_examples.append(example)
-    
-    # Aggiorna il testset
-    testset_dict['examples'] = enriched_examples
-    
-    return testset_dict
-
-def generate_testset(n_samples=50, output_file="testset_ragas.json", use_custom_retriever=True):
-    """
-    Genera il testset usando Ragas con componenti custom
+    Genera il testset usando Ragas con Azure OpenAI
     
     Args:
         n_samples: Numero di domande da generare
         output_file: File di output per salvare il testset
-        use_custom_retriever: Se True, arricchisce il testset con i documenti recuperati dal tuo retriever
+        use_custom_retriever: Se True, arricchisce il testset con i documenti recuperati
     """
     print("📚 Caricamento documenti...")
     documents = load_all_docs()
     print(f"✅ Caricati {len(documents)} documenti")
+    
+    # Converti in LlamaIndex Documents
+    print("🔄 Conversione documenti in formato LlamaIndex...")
+    llama_docs = []
+    for i, doc in enumerate(documents):
+        # Filtra documenti troppo corti o vuoti
+        if doc.page_content and len(doc.page_content.strip()) > 50:
+            llama_doc = LlamaDocument(
+                text=doc.page_content,
+                metadata=doc.metadata if hasattr(doc, 'metadata') else {},
+                id_=f"doc_{i}"
+            )
+            llama_docs.append(llama_doc)
+    
+    print(f"📄 Documenti validi: {len(llama_docs)}")
+    
+    if len(llama_docs) < 5:
+        print(f"❌ Troppo pochi documenti ({len(llama_docs)}). Servono almeno 5 documenti validi.")
+        return None
 
-    # Crea il retriever wrapper
-    custom_retriever = create_custom_retriever(retrieve_fn)
+    azure_llm = AzureChatOpenAI(
+        azure_endpoint="https://cs-test.openai.azure.com",
+        api_key=os.getenv("OPENAI_API_KEY"),
+        api_version=os.getenv("LLM_VERSION"),
+        deployment_name=os.getenv("LLM_MODEL"),
+        temperature=0.3,
+    )
 
-    # Inizializza il generator con la nuova API
+    azure_embeddings = AzureOpenAIEmbeddings(
+        azure_endpoint="https://cs-test.openai.azure.com",
+        api_key=os.getenv("OPENAI_API_KEY"),
+        api_version=os.getenv("EMBEDDING_VERSION_2"),
+        deployment=os.getenv("EMBEDDING_MODEL_2"),
+    )
+
+    # Inizializza il generator di Ragas
     generator = TestsetGenerator(
-        llm=ChatOpenAI(model="gpt-4", temperature=0.3),
-        knowledge_graph=KnowledgeGraph(),  # Opzionale: per relazioni tra documenti
-        embedding_model=LangchainEmbeddingsWrapper(embeddings=OpenAIEmbeddings(model="text-embedding-3-small")),
+        llm=LangchainLLMWrapper(azure_llm), 
+        embedding_model=LangchainEmbeddingsWrapper(embeddings=azure_embeddings),
     )
     
-    print(f"🎯 Generazione di {n_samples} domande...")
+    print(f"🎯 Generazione di {n_samples} domande da {len(llama_docs)} documenti...")
     try:
-        # Genera il testset
-        testset = generator.generate_with_langchain_docs(
-            documents=documents,
-            testset_size=n_samples,
-            raise_exceptions=False  # Continua anche se alcune domande falliscono
-        )
+        # ✅ Usa almeno 10-20 documenti per generare personas diverse
+        num_docs = min(30, len(llama_docs))  # Usa max 30 documenti
+        print(f"   Usando {num_docs} documenti per la generazione...")
         
-        # Arricchisco il testset con i documenti che il TUO retriever recupererebbe
-        if use_custom_retriever:
-            print("\n🔍 Arricchimento testset con custom retriever...")
-            testset = enrich_testset_with_retriever(testset, custom_retriever)
-            print("✅ Testset arricchito con retrieval custom")
+        # Genera il testset
+        testset = generator.generate_with_llamaindex_docs(
+            documents=llama_docs[:num_docs],
+            testset_size=n_samples,
+            raise_exceptions=True,
+        )
         
         print(f"✅ Testset generato! Numero domande: {len(testset)}")
         
-        # Converti in formato serializzabile (già fatto se use_custom_retriever=True)
-        if not use_custom_retriever:
-            testset = testset.to_dict()
+        # Converti in formato serializzabile
+        testset_dict = testset.to_list()
         
         # Salva il testset
         with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(testset, f, ensure_ascii=False, indent=2)
+            json.dump(testset_dict, f, ensure_ascii=False, indent=2)
         
         print(f"💾 Testset salvato in: {output_file}")
         
-        # Mostra alcune statistiche
+        # Mostra statistiche
         print("\n📊 Statistiche testset:")
-        if 'examples' in testset:
-            examples = testset['examples']
+        if 'examples' in testset_dict:
+            examples = testset_dict['examples']
             print(f"  - Totale esempi: {len(examples)}")
             
             # Conta tipi di domande
@@ -200,82 +138,21 @@ def generate_testset(n_samples=50, output_file="testset_ragas.json", use_custom_
             print("  - Distribuzione tipi:")
             for q_type, count in question_types.items():
                 print(f"    • {q_type}: {count}")
-            
-            # Se hai usato il custom retriever, mostra anche stats sul retrieval
-            if use_custom_retriever and examples:
-                retrieved_counts = [ex.get('retrieved_count', 0) for ex in examples]
-                avg_retrieved = sum(retrieved_counts) / len(retrieved_counts) if retrieved_counts else 0
-                print(f"\n  - Media documenti recuperati: {avg_retrieved:.2f}")
-                print(f"  - Min/Max documenti: {min(retrieved_counts)}/{max(retrieved_counts)}")
         
-        return testset
+        return testset_dict
         
     except Exception as e:
-        print(f"❌ Errore durante la generazione: {str(e)}")
+        print(f"❌ Errore: {str(e)}")
         import traceback
         traceback.print_exc()
         return None
 
-def evaluate_with_testset(testset_file="testset_ragas.json"):
-    """
-    Opzionale: valuta il tuo RAG system usando il testset generato
-    """
-    from ragas import evaluate
-    from ragas.metrics import (
-        answer_relevancy,
-        faithfulness,
-        context_recall,
-        context_precision,
-    )
-    
-    # Carica il testset
-    with open(testset_file, "r", encoding="utf-8") as f:
-        testset_data = json.load(f)
-    
-    # Prepara i dati per la valutazione
-    eval_data = {
-        "question": [],
-        "answer": [],
-        "contexts": [],
-        "ground_truth": []
-    }
-    
-    for example in testset_data.get('examples', []):
-        question = example.get('question', '')
-        
-        # Esegui il tuo RAG
-        retrieved_docs = retrieve_fn(question)
-        answer = llm.generate_final_answer(
-            question, 
-            retrieved_docs, 
-            []
-        )
-        
-        eval_data["question"].append(question)
-        eval_data["answer"].append(answer)
-        eval_data["contexts"].append([doc.page_content for doc in retrieved_docs])
-        eval_data["ground_truth"].append(example.get('ground_truth', ''))
-    
-    # Valuta
-    results = evaluate(
-        dataset=eval_data,
-        metrics=[
-            answer_relevancy,
-            faithfulness,
-            context_recall,
-            context_precision,
-        ],
-    )
-    
-    print("\n📈 Risultati valutazione:")
-    print(results)
-    
-    return results
-
-
 if __name__ == "__main__":
     # Genera il testset
-    testset = generate_testset(n_samples=50)
+    testset = generate_testset(n_samples=5)
     
-    # Opzionale: valuta il sistema
-    # results = evaluate_with_testset()
+    if testset:
+        print("\n✨ Testset generato con successo!")
+        print("Puoi ora usarlo per valutare il tuo sistema RAG.")
+    else:
+        print("\n⚠️ Generazione testset fallita. Controlla gli errori sopra.")

@@ -50,7 +50,6 @@ def semantic_search(prompt, top_n=10):
             "titolo": titolo,
             "autore": autore,
             "documento": documento,
-            "autore": autore,
             "url_doc": url_doc,
             "content": content,
             "embedding": embedding,
