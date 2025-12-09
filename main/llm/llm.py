@@ -4,6 +4,8 @@ import json
 import os
 import search
 import tiktoken
+from docx import Document
+from difflib import SequenceMatcher
 
 # 0. CONFIGURAZIONE =====================================================
 
@@ -123,19 +125,43 @@ def decide_tools(prompt: str) -> dict:
 
 
 # 2. SELEZIONE DOCUMENTI =====================================================
-def select_documents(user_prompt: str, documents: list) -> dict:
+def select_documents(user_prompt: str, chunks: list) -> dict:
     
+    # Carico template
+    doc = Document("main/llm/Sample_RI.docx")
+    template_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
+
+    # Filtro i chunk simili al template
+    documents = []
+    removed_indices = []
+    similarity_threshold=0.9
+    for i, chunk in enumerate(chunks):
+        sim_template = SequenceMatcher(None, chunk['content'], template_text).ratio()
+        if sim_template < similarity_threshold:
+            documents.append(chunk)
+        else:
+            removed_indices.append(i)
+
+    if not documents:
+        # Se tutti i chunk sono simili al template, restituisco fallback
+        return {
+            "relevant_docs": [],
+            "irrelevant_docs": list(range(len(chunks))),
+            "reason": "Tutti i chunk sono simili al template di base e quindi non utili."
+        }
+
     system_message = """
     Sei un assistente decisionale incaricato di filtrare documenti estratti da un sistema 
     di ricerca per il software gestionale SAM ERP2 dell'azienda Centro Software. 
-    Devi identificare quali documenti tra quelli estratti sono strettamente utili per rispondere a una richiesta
-    utente e coerenti con essa nello specifico, distinguendo tra funzionalità standard e plugin/customizzazioni. 
+    Devi identificare quali documenti tra quelli estratti sono strettamente utili per rispondere a una richiesta utente e coerenti
+    con essa nello specifico, tenendo sempre conto delle funzionalità standard e di quelle offerte solo tramite plugin/customizzazioni. 
 
     Nota:
     - La ricerca documentale restituisce sempre i top 25 documenti più rilevanti, ma non tutti sono effettivamente utili.
-    - Seleziona un massimo di 20 documenti rilevanti, dando precedenza a quelli più coerenti con la richiesta dell'utente.
+    - Seleziona solo i documenti più coerenti con la richiesta dell'utente, fino ad un massimo di 15.
     - Per ciascun documento è disponibile il contenuto e il valore di similarità coseno con il prompt utente.
-    Usa queste informazioni come guida, ma valuta anche il contenuto reale in termini di utilità per la risposta e la coerenza con la domanda.
+    Usa queste informazioni come guida, ma considera anche il contenuto reale in termini di utilità per la risposta e la coerenza con la domanda.
+    - Alcuni chunk potrebbero essere identici al template di base e quindi privi di utilità.
 
     Criteri di rilevanza:
     1. Un documento è rilevante se contiene informazioni concrete che aiutano a rispondere 
@@ -207,14 +233,13 @@ def select_documents(user_prompt: str, documents: list) -> dict:
         }
     ]
 
-
     # Costruisco il few-shot text
     few_shot_text = ""
     for ex in examples:
         docs_text = "\n".join([f"{i}: {d['titolo']} - {d['content']} (autore: {d['autore']}, cliente: {d['cliente']})" for i, d in enumerate(ex['documents'])])
         few_shot_text += f"Prompt utente: {ex['prompt']}\nDocumenti:\n{docs_text}\nDecisione: {json.dumps(ex['decision'])}\n\n"
 
-    # Testo del prompt per il modello
+    # Prompt utente per il modello con i chunk reali
     docs_text = "\n".join([f"{i}: {d['titolo']} - {d['content']} (autore: {d['autore']}, cliente: {d['cliente']})" for i, d in enumerate(documents)])
     user_message = f"{few_shot_text}Prompt utente: {user_prompt}\nDocumenti:\n{docs_text}\nDecisione:"
 
@@ -232,7 +257,15 @@ def select_documents(user_prompt: str, documents: list) -> dict:
 
     # Parsing JSON con fallback
     try:
-        decision = json.loads(decision_text)
+        decision_filtered = json.loads(decision_text)
+        # Ricostruiamo gli indici rispetto ai chunk originali
+        relevant_docs = [documents[i] for i in decision_filtered.get("relevant_docs", [])]
+        irrelevant_docs = removed_indices + [documents[i] for i in decision_filtered.get("irrelevant_docs", [])]
+        decision = {
+            "relevant_docs": [chunks.index(chunk) for chunk in relevant_docs],
+            "irrelevant_docs": [chunks.index(chunk) if isinstance(chunk, dict) else chunk for chunk in irrelevant_docs],
+            "reason": decision_filtered.get("reason", "Decisione generata dall'LLM")
+        }
     except json.JSONDecodeError:
         decision = {
             "relevant_docs": [],
