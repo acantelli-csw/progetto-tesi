@@ -460,8 +460,6 @@ def gpt_request(messages):
     if tools["use_semantic"] or tools["use_keyword"]:
         if all_documents:
             document_selection = select_documents(user_prompt, all_documents)
-
-            # Selezione documenti rilevanti
             selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
 
     # 3 - Genera risposta finale in modalità stream
