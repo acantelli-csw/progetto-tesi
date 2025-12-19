@@ -29,7 +29,8 @@ dependencies = [
     "datasets==2.19.1",
     "llama_index",
     "six==1.16.0",
-    "rapidfuzz"       
+    "rapidfuzz",
+    "langchain_experimental"    
 ]
 
 [build-system]

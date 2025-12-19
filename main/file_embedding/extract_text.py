@@ -18,8 +18,8 @@ def remove_placeholders(text: str) -> str:
 # Estrazione testo e trascrizione immagini dai documenti in base all'estensione
 def extract_text_from_varbinary(file_data, extension, numero, reader):
 
-    ext = extension.lower()
     full_text = ""
+    ext = "".join(extension.lower().split())
 
     try:
 
