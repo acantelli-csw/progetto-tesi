@@ -21,14 +21,6 @@ class ChunkingStrategy(Enum):
     """Enum per le strategie di chunking disponibili"""
     FIXED_SIZE = "fixed"
     RECURSIVE = "recursive"
-    SEMANTIC = "semantic"
-
-
-class SemanticThreshold(Enum):
-    """Enum per i tipi di threshold del semantic chunking"""
-    PERCENTILE = "percentile"
-    STANDARD_DEVIATION = "standard_deviation"
-
 
 @dataclass
 class ChunkingConfig:
@@ -41,11 +33,7 @@ class ChunkingConfig:
     
     # Parametri per Recursive
     recursive_separators: Optional[List[str]] = None
-    
-    # Parametri per Semantic
-    semantic_threshold_type: SemanticThreshold = SemanticThreshold.PERCENTILE
-    semantic_breakpoint_threshold_amount: Optional[float] = None
-    
+
     def __post_init__(self):
         """Imposta valori di default se non specificati"""
         if self.recursive_separators is None:
@@ -63,35 +51,21 @@ class ChunkingConfig:
                 ""
             ]
             custom_separators = [
-                "\n## ",            # Titoli principali         - Es: "## Relazione Macro Analisi"
-                "\n####### ",       # Titoli Secondari          - Es: "####### Percorso di memorizzazione dei sorgenti"
-                "\n**",             # Sezioni in grassetto      - Es: "**Richiesta Cliente**", "**Soluzione Proposta**"
-                "\n> ",             # Blocchi citati/indentati  - Es: "> Spett. **ALFA SERVICE S.R.L.**"
-                "\n  -----------",  # Separatore tabelle
-                "\n-   ",           # Liste puntate             - Es: "-   Occorre definire in questa sezione..."
-                "\n\n",     # Paragrafi (doppio newline = cambio paragrafo)
-                "\n",       # Singole righe
-                ". ",       # Frasi (punto seguito da spazio)  
-                ", ",       # Clausole (virgola seguita da spazio)
-                " ",        # Parole (spazio)
-                ""          # Caratteri (fallback)
-            ]
-            plain_text_separators = [
                 "\n\n\n",           # Sezioni separate da righe vuote multiple
                 "\n\n",             # Paragrafi (doppio newline)
-                "\nRichiesta Cliente\n",    # Sezione specifica
-                "\nSoluzione Proposta\n",   # Sezione specifica
-                "\nAnalisi Tecnica\n",      # Sezione specifica
-                "\nOutput elaborazione\n",  # Sezione specifica
+                "\nRichiesta Cliente\n",    # Sezione specifica derivante dal sample del documento di pertenza
+                "\nSoluzione Proposta\n",   # Sezione specifica derivante dal sample del documento di pertenza
+                "\nAnalisi Tecnica\n",      # Sezione specifica derivante dal sample del documento di pertenza
+                "\nOutput elaborazione\n",  # Sezione specifica derivante dal sample del documento di pertenza
                 "\n",               # Singole righe
                 ". ",               # Frasi
                 ", ",               # Clausole
                 " ",                # Parole
                 ""                  # Caratteri (fallback)
             ]
-            self.recursive_separators = plain_text_separators
+            self.recursive_separators = custom_separators
 
-def create_text_splitter(config: ChunkingConfig, embeddings_function=None):
+def create_text_splitter(config: ChunkingConfig):
 
     if config.strategy == ChunkingStrategy.FIXED_SIZE:
         print(f"Usando Fixed-size chunking: size={config.chunk_size}, overlap={config.chunk_overlap}")
@@ -101,7 +75,7 @@ def create_text_splitter(config: ChunkingConfig, embeddings_function=None):
         )
     
     elif config.strategy == ChunkingStrategy.RECURSIVE:
-        print(f"Usando Recursive chunking con overlap={config.chunk_overlap}")
+        print(f"Usando Recursive chunking con chunk size={config.chunk_size} overlap={config.chunk_overlap}")
         #print(f"Separatori: {config.recursive_separators[:3]}...")
         return RecursiveCharacterTextSplitter(
             separators=config.recursive_separators,
@@ -109,29 +83,6 @@ def create_text_splitter(config: ChunkingConfig, embeddings_function=None):
             chunk_overlap=config.chunk_overlap,
             length_function=len,
             is_separator_regex=False
-        )
-    
-    elif config.strategy == ChunkingStrategy.SEMANTIC:
-        if embeddings_function is None:
-            raise ValueError("embeddings_function è richiesta per semantic chunking")
-        
-        # Wrapper per adattare la funzione di embedding al formato richiesto da SemanticChunker
-        class EmbeddingWrapper:
-            def embed_documents(self, texts: List[str]) -> List[List[float]]:
-                return [embeddings_function(text) for text in texts]
-        
-        breakpoint_params = {}
-        if config.semantic_breakpoint_threshold_amount is not None:
-            breakpoint_params['breakpoint_threshold_amount'] = config.semantic_breakpoint_threshold_amount
-        
-        print(f"Usando Semantic chunking: threshold_type={config.semantic_threshold_type.value}")
-        if breakpoint_params:
-            print(f"Parametri: {breakpoint_params}")
-        
-        return SemanticChunker(
-            embeddings=EmbeddingWrapper(),
-            breakpoint_threshold_type=config.semantic_threshold_type.value,
-            **breakpoint_params
         )
     
     else:
@@ -200,22 +151,6 @@ def process_files(config: ChunkingConfig, limit: Optional[int] = 10):
         if not text.strip():
             print(f"  ⚠ Nessun testo estratto, file saltato\n")
             continue
-
-        # AGGIUNGI QUESTO DEBUG
-        print(f"\n{'='*80}")
-        print(f"TESTO ESTRATTO (primi 1000 caratteri):")
-        print(f"{'='*80}")
-        print(text[:1000])
-        print(f"\n{'='*80}")
-        print(f"ANALISI SEPARATORI TROVATI:")
-        print(f"{'='*80}")
-        separators_found = {}
-        for sep in config.recursive_separators:
-            count = text.count(sep)
-            if count > 0:
-                separators_found[repr(sep)] = count
-        print(f"Separatori trovati: {separators_found}")
-        print(f"{'='*80}\n")
         
         # Chunking del testo
         try:
@@ -329,28 +264,13 @@ def main():
     # ESEMPIO 2: RECURSIVE
     config_recursive = ChunkingConfig(
         strategy=ChunkingStrategy.RECURSIVE,
-        chunk_size=512,
-        chunk_overlap=100
+        chunk_size=1024,
+        chunk_overlap=105
     )
     
-    # ESEMPIO 3: SEMANTIC con Percentile
-    config_semantic_percentile = ChunkingConfig(
-        strategy=ChunkingStrategy.SEMANTIC,
-        semantic_threshold_type=SemanticThreshold.PERCENTILE,
-        semantic_breakpoint_threshold_amount=95
-    )
-    
-    # ESEMPIO 4: SEMANTIC con Standard Deviation
-    config_semantic_std = ChunkingConfig(
-        strategy=ChunkingStrategy.SEMANTIC,
-        semantic_threshold_type=SemanticThreshold.STANDARD_DEVIATION,
-        semantic_breakpoint_threshold_amount=3
-    )
-    
-    # ========================================================================
+
     # SCEGLI LA CONFIGURAZIONE DA USARE
-    # ========================================================================
-    
+
     selected_config = config_recursive
     limit = 1  # Numero max di file da elaborare
     process_files(selected_config, limit)
