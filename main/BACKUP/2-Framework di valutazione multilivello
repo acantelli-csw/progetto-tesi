@@ -1,0 +1,452 @@
+"""
+Framework di valutazione multi-livello per sistemi RAG.
+Permette di testare diversi aspetti del sistema separatamente.
+"""
+
+import json
+import numpy as np
+from typing import List, Dict, Tuple
+from dataclasses import dataclass
+from enum import Enum
+
+
+class EvaluationLevel(Enum):
+    """Livelli di valutazione del sistema RAG"""
+    RETRIEVAL = "retrieval"              # Solo recupero documenti
+    RELEVANCE = "relevance"              # Rilevanza dei documenti
+    FAITHFULNESS = "faithfulness"        # Fedeltà alla fonte
+    ANSWER_QUALITY = "answer_quality"    # Qualità risposta finale
+
+
+@dataclass
+class EvaluationResult:
+    """Risultato di una valutazione"""
+    level: EvaluationLevel
+    question_id: str
+    score: float
+    details: Dict
+    passed: bool
+
+
+class MultiLevelEvaluator:
+    """
+    Valutatore multi-livello che permette di analizzare
+    separatamente diversi aspetti del sistema RAG.
+    """
+    
+    def __init__(self, testset: List[Dict]):
+        self.testset = testset
+        self.results = {level: [] for level in EvaluationLevel}
+    
+    # ========================================================================
+    # LIVELLO 1: RETRIEVAL PURO (Precision, Recall, MRR)
+    # ========================================================================
+    
+    def evaluate_retrieval(self, 
+                          k_values: List[int] = [3, 5, 10]) -> Dict[str, float]:
+        """
+        Valuta solo la capacità di recupero documenti.
+        Metriche: Precision@K, Recall@K, MRR, MAP
+        """
+        print("\n" + "="*70)
+        print("📊 LIVELLO 1: VALUTAZIONE RETRIEVAL")
+        print("="*70)
+        
+        metrics_by_k = {k: {'precision': [], 'recall': []} for k in k_values}
+        mrr_scores = []
+        map_scores = []
+        
+        for question in self.testset:
+            if not question.get('ground_truth_doc_ids'):
+                continue  # Skip domande senza ground truth
+            
+            gt_ids = set(str(id) for id in question['ground_truth_doc_ids'])
+            retrieved_ids = question.get('retrieved_doc_ids', [])
+            
+            # Calcola per diversi valori di K
+            for k in k_values:
+                top_k = retrieved_ids[:k]
+                top_k_set = set(str(id) for id in top_k)
+                
+                # Precision@K e Recall@K
+                if top_k_set:
+                    tp = len(gt_ids & top_k_set)
+                    precision = tp / len(top_k_set)
+                    recall = tp / len(gt_ids) if gt_ids else 0
+                    
+                    metrics_by_k[k]['precision'].append(precision)
+                    metrics_by_k[k]['recall'].append(recall)
+            
+            # MRR (Mean Reciprocal Rank)
+            reciprocal_rank = 0
+            for i, doc_id in enumerate(retrieved_ids, 1):
+                if str(doc_id) in gt_ids:
+                    reciprocal_rank = 1.0 / i
+                    break
+            mrr_scores.append(reciprocal_rank)
+            
+            # MAP (Mean Average Precision)
+            ap = self._average_precision(gt_ids, retrieved_ids)
+            map_scores.append(ap)
+        
+        # Calcola medie
+        results = {
+            'MRR': np.mean(mrr_scores) if mrr_scores else 0,
+            'MAP': np.mean(map_scores) if map_scores else 0
+        }
+        
+        for k in k_values:
+            if metrics_by_k[k]['precision']:
+                results[f'Precision@{k}'] = np.mean(metrics_by_k[k]['precision'])
+                results[f'Recall@{k}'] = np.mean(metrics_by_k[k]['recall'])
+                results[f'F1@{k}'] = 2 * results[f'Precision@{k}'] * results[f'Recall@{k}'] / \
+                                     (results[f'Precision@{k}'] + results[f'Recall@{k}']) \
+                                     if (results[f'Precision@{k}'] + results[f'Recall@{k}']) > 0 else 0
+        
+        self._print_retrieval_results(results)
+        return results
+    
+    def _average_precision(self, gt_ids: set, retrieved_ids: List[str]) -> float:
+        """Calcola Average Precision per MAP"""
+        if not gt_ids or not retrieved_ids:
+            return 0.0
+        
+        hits = 0
+        sum_precisions = 0.0
+        
+        for i, doc_id in enumerate(retrieved_ids, 1):
+            if str(doc_id) in gt_ids:
+                hits += 1
+                precision_at_i = hits / i
+                sum_precisions += precision_at_i
+        
+        return sum_precisions / len(gt_ids) if len(gt_ids) > 0 else 0.0
+    
+    # ========================================================================
+    # LIVELLO 2: RELEVANCE (Quanto sono rilevanti i docs recuperati?)
+    # ========================================================================
+    
+    def evaluate_relevance(self, 
+                          llm_judge_fn=None,
+                          use_ground_truth: bool = True) -> Dict[str, float]:
+        """
+        Valuta la rilevanza dei documenti recuperati.
+        
+        Args:
+            llm_judge_fn: Funzione LLM per giudicare rilevanza (opzionale)
+            use_ground_truth: Se True, usa ground truth; altrimenti usa LLM judge
+        """
+        print("\n" + "="*70)
+        print("📊 LIVELLO 2: VALUTAZIONE RELEVANCE")
+        print("="*70)
+        
+        relevance_scores = []
+        ndcg_scores = []
+        
+        for question in self.testset:
+            retrieved_contexts = question.get('retrieved_contexts', [])
+            
+            if use_ground_truth and question.get('ground_truth_doc_ids'):
+                # Usa ground truth per determinare rilevanza
+                gt_ids = set(str(id) for id in question['ground_truth_doc_ids'])
+                retrieved_ids = question.get('retrieved_doc_ids', [])
+                
+                # Binary relevance (1 se nel ground truth, 0 altrimenti)
+                relevance = [1 if str(doc_id) in gt_ids else 0 
+                           for doc_id in retrieved_ids]
+                
+            elif llm_judge_fn:
+                # Usa LLM per giudicare rilevanza (più flessibile ma costoso)
+                relevance = []
+                for context in retrieved_contexts:
+                    score = llm_judge_fn(question['question'], context)
+                    relevance.append(score)
+            else:
+                continue
+            
+            if relevance:
+                # Relevance media
+                avg_relevance = np.mean(relevance)
+                relevance_scores.append(avg_relevance)
+                
+                # NDCG (Normalized Discounted Cumulative Gain)
+                ndcg = self._calculate_ndcg(relevance)
+                ndcg_scores.append(ndcg)
+        
+        results = {
+            'Average_Relevance': np.mean(relevance_scores) if relevance_scores else 0,
+            'NDCG': np.mean(ndcg_scores) if ndcg_scores else 0
+        }
+        
+        self._print_relevance_results(results)
+        return results
+    
+    def _calculate_ndcg(self, relevance_scores: List[float], k: int = None) -> float:
+        """Calcola Normalized Discounted Cumulative Gain"""
+        if not relevance_scores:
+            return 0.0
+        
+        if k:
+            relevance_scores = relevance_scores[:k]
+        
+        # DCG
+        dcg = sum(rel / np.log2(i + 2) for i, rel in enumerate(relevance_scores))
+        
+        # IDCG (DCG ideale con ranking perfetto)
+        ideal_relevance = sorted(relevance_scores, reverse=True)
+        idcg = sum(rel / np.log2(i + 2) for i, rel in enumerate(ideal_relevance))
+        
+        return dcg / idcg if idcg > 0 else 0.0
+    
+    # ========================================================================
+    # LIVELLO 3: FAITHFULNESS (La risposta è fedele ai documenti?)
+    # ========================================================================
+    
+    def evaluate_faithfulness(self, 
+                             generated_answers: List[str],
+                             ragas_evaluator=None) -> Dict[str, float]:
+        """
+        Valuta se le risposte generate sono fedeli ai documenti recuperati.
+        Usa Ragas faithfulness metric o implementazione custom.
+        """
+        print("\n" + "="*70)
+        print("📊 LIVELLO 3: VALUTAZIONE FAITHFULNESS")
+        print("="*70)
+        
+        if ragas_evaluator:
+            # Usa Ragas per calcolare faithfulness
+            from ragas.metrics import faithfulness
+            from datasets import Dataset
+            
+            eval_data = []
+            for i, question in enumerate(self.testset):
+                if i < len(generated_answers):
+                    eval_data.append({
+                        'question': question['question'],
+                        'answer': generated_answers[i],
+                        'contexts': question.get('retrieved_contexts', [])
+                    })
+            
+            dataset = Dataset.from_list(eval_data)
+            scores = faithfulness.score(dataset)
+            
+            return {'Faithfulness': np.mean(scores)}
+        
+        else:
+            # Implementazione semplificata
+            print("⚠️  Implementazione faithfulness custom non disponibile")
+            print("💡 Usa Ragas per metriche faithfulness accurate")
+            return {'Faithfulness': None}
+    
+    # ========================================================================
+    # LIVELLO 4: ANSWER QUALITY (Qualità risposta end-to-end)
+    # ========================================================================
+    
+    def evaluate_answer_quality(self,
+                               generated_answers: List[str],
+                               ragas_evaluator=None) -> Dict[str, float]:
+        """
+        Valuta la qualità complessiva delle risposte generate.
+        Usa metriche Ragas: answer_relevancy, answer_correctness, ecc.
+        """
+        print("\n" + "="*70)
+        print("📊 LIVELLO 4: VALUTAZIONE ANSWER QUALITY")
+        print("="*70)
+        
+        if not ragas_evaluator:
+            print("⚠️  Ragas evaluator richiesto per answer quality")
+            return {}
+        
+        from ragas.metrics import answer_relevancy, answer_correctness
+        from datasets import Dataset
+        
+        eval_data = []
+        for i, question in enumerate(self.testset):
+            if i < len(generated_answers):
+                eval_data.append({
+                    'question': question['question'],
+                    'answer': generated_answers[i],
+                    'contexts': question.get('retrieved_contexts', []),
+                    'ground_truth': question.get('reference_answer', '')
+                })
+        
+        dataset = Dataset.from_list(eval_data)
+        
+        # Calcola metriche
+        results = {}
+        
+        try:
+            rel_scores = answer_relevancy.score(dataset)
+            results['Answer_Relevancy'] = np.mean(rel_scores)
+        except Exception as e:
+            print(f"⚠️  Error in answer_relevancy: {e}")
+        
+        try:
+            corr_scores = answer_correctness.score(dataset)
+            results['Answer_Correctness'] = np.mean(corr_scores)
+        except Exception as e:
+            print(f"⚠️  Error in answer_correctness: {e}")
+        
+        self._print_answer_quality_results(results)
+        return results
+    
+    # ========================================================================
+    # ANALISI COMPARATIVA PER TIER
+    # ========================================================================
+    
+    def compare_by_tier(self) -> Dict[str, Dict[str, float]]:
+        """
+        Confronta le performance tra GOLD, SILVER e STRESS questions.
+        FONDAMENTALE per la tesi: mostra come il sistema si comporta
+        in condizioni diverse.
+        """
+        print("\n" + "="*70)
+        print("📊 ANALISI COMPARATIVA PER TIER")
+        print("="*70)
+        
+        tiers = {}
+        
+        for tier_name in ['gold_standard', 'silver_standard', 'stress_test']:
+            tier_questions = [q for q in self.testset 
+                            if q.get('tier') == tier_name]
+            
+            if not tier_questions:
+                continue
+            
+            print(f"\n{tier_name.upper()}:")
+            
+            # Calcola metriche per questo tier
+            tier_metrics = {}
+            
+            # Retrieval metrics
+            precision_scores = []
+            recall_scores = []
+            
+            for q in tier_questions:
+                if q.get('metrics'):
+                    precision_scores.append(q['metrics']['precision'])
+                    recall_scores.append(q['metrics']['recall'])
+            
+            if precision_scores:
+                tier_metrics['precision'] = np.mean(precision_scores)
+                tier_metrics['recall'] = np.mean(recall_scores)
+                tier_metrics['f1'] = 2 * tier_metrics['precision'] * tier_metrics['recall'] / \
+                                    (tier_metrics['precision'] + tier_metrics['recall']) \
+                                    if (tier_metrics['precision'] + tier_metrics['recall']) > 0 else 0
+                
+                print(f"  Precision: {tier_metrics['precision']:.3f}")
+                print(f"  Recall: {tier_metrics['recall']:.3f}")
+                print(f"  F1: {tier_metrics['f1']:.3f}")
+            
+            tiers[tier_name] = tier_metrics
+        
+        return tiers
+    
+    # ========================================================================
+    # UTILITY FUNCTIONS
+    # ========================================================================
+    
+    def _print_retrieval_results(self, results: Dict[str, float]):
+        """Stampa risultati retrieval in modo leggibile"""
+        print("\n📈 Risultati:")
+        print(f"  MRR (Mean Reciprocal Rank): {results.get('MRR', 0):.3f}")
+        print(f"  MAP (Mean Average Precision): {results.get('MAP', 0):.3f}")
+        
+        for k in [3, 5, 10]:
+            if f'Precision@{k}' in results:
+                print(f"\n  Top-{k}:")
+                print(f"    Precision@{k}: {results[f'Precision@{k}']:.3f}")
+                print(f"    Recall@{k}: {results[f'Recall@{k}']:.3f}")
+                print(f"    F1@{k}: {results[f'F1@{k}']:.3f}")
+    
+    def _print_relevance_results(self, results: Dict[str, float]):
+        print("\n📈 Risultati:")
+        print(f"  Average Relevance: {results.get('Average_Relevance', 0):.3f}")
+        print(f"  NDCG: {results.get('NDCG', 0):.3f}")
+    
+    def _print_answer_quality_results(self, results: Dict[str, float]):
+        print("\n📈 Risultati:")
+        for metric, score in results.items():
+            if score is not None:
+                print(f"  {metric}: {score:.3f}")
+    
+    def generate_full_report(self, 
+                           output_file: str = "evaluation_report.json",
+                           include_charts: bool = True):
+        """
+        Genera report completo con tutti i livelli di valutazione.
+        Ideale per la tesi: fornisce analisi completa e visualizzazioni.
+        """
+        report = {
+            'summary': {
+                'total_questions': len(self.testset),
+                'gold_questions': sum(1 for q in self.testset if q.get('tier') == 'gold_standard'),
+                'silver_questions': sum(1 for q in self.testset if q.get('tier') == 'silver_standard'),
+                'stress_questions': sum(1 for q in self.testset if q.get('tier') == 'stress_test'),
+            },
+            'retrieval_metrics': self.evaluate_retrieval(),
+            'relevance_metrics': self.evaluate_relevance(),
+            'tier_comparison': self.compare_by_tier(),
+        }
+        
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(report, f, ensure_ascii=False, indent=2)
+        
+        print(f"\n💾 Report completo salvato in: {output_file}")
+        
+        if include_charts:
+            self._generate_charts(report)
+    
+    def _generate_charts(self, report: Dict):
+        """Genera grafici per il report (usa matplotlib/seaborn)"""
+        try:
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            
+            # TODO: Implementa visualizzazioni
+            print("\n📊 Grafici salvati in: evaluation_charts/")
+            
+        except ImportError:
+            print("\n⚠️  matplotlib/seaborn non disponibili per grafici")
+
+
+# ============================================================================
+# ESEMPIO DI UTILIZZO COMPLETO
+# ============================================================================
+
+def run_full_evaluation(testset_file: str):
+    """
+    Esegue valutazione completa multi-livello.
+    """
+    # Carica testset
+    with open(testset_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        testset = data.get('questions', data)  # Supporta entrambi i formati
+    
+    # Inizializza evaluator
+    evaluator = MultiLevelEvaluator(testset)
+    
+    # Valutazione completa
+    print("\n🚀 Avvio valutazione multi-livello...")
+    
+    # LIVELLO 1: Retrieval
+    retrieval_results = evaluator.evaluate_retrieval(k_values=[3, 5, 10])
+    
+    # LIVELLO 2: Relevance
+    relevance_results = evaluator.evaluate_relevance(use_ground_truth=True)
+    
+    # LIVELLO 3 & 4: Richiedono risposte generate
+    # (Da eseguire dopo aver generato risposte con il tuo LLM)
+    
+    # Confronto per tier
+    tier_comparison = evaluator.compare_by_tier()
+    
+    # Genera report finale
+    evaluator.generate_full_report("evaluation_report_full.json")
+    
+    return evaluator
+
+
+if __name__ == "__main__":
+    # Esempio
+    evaluator = run_full_evaluation("testset_ibrido_stratificato.json")

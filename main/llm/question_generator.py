@@ -25,6 +25,7 @@ REGOLE CRITICHE:
 3. Le domande devono essere naturali e ben formate in italiano
 4. NON mescolare inglese e italiano
 5. Mantieni il contesto del software gestionale SAM ERP2
+6. Inserisci riferimenti all'azienda cliente nelle domande
 
 Esempio di domande corrette:
 - "Come posso configurare un nuovo magazzino in SAM ERP2?"

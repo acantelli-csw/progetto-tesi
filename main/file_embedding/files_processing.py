@@ -2,7 +2,6 @@ from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
     TokenTextSplitter
 )
-from langchain_experimental.text_splitter import SemanticChunker
 import extract_text
 import db_connection
 import embedding
@@ -28,9 +27,9 @@ class ChunkingConfig:
     strategy: ChunkingStrategy
     
     # Parametri per Fixed-size
-    chunk_size: int = 512
-    chunk_overlap: int = 100
-    
+    chunk_size: int
+    chunk_overlap: int
+
     # Parametri per Recursive
     recursive_separators: Optional[List[str]] = None
 
@@ -51,12 +50,12 @@ class ChunkingConfig:
                 ""
             ]
             custom_separators = [
+                #"\nRichiesta Cliente\n",  
+                #"\nSoluzione Proposta\n",
+                "\nAnalisi Tecnica\n",      # Sezione specifica derivante dal sample RI
+                "\n[OCR immagine embedded]:" # Sezione relativa all'OCR di un immagine
                 "\n\n\n",           # Sezioni separate da righe vuote multiple
                 "\n\n",             # Paragrafi (doppio newline)
-                "\nRichiesta Cliente\n",    # Sezione specifica derivante dal sample del documento di pertenza
-                "\nSoluzione Proposta\n",   # Sezione specifica derivante dal sample del documento di pertenza
-                "\nAnalisi Tecnica\n",      # Sezione specifica derivante dal sample del documento di pertenza
-                "\nOutput elaborazione\n",  # Sezione specifica derivante dal sample del documento di pertenza
                 "\n",               # Singole righe
                 ". ",               # Frasi
                 ", ",               # Clausole
@@ -97,10 +96,7 @@ def process_files(config: ChunkingConfig, limit: Optional[int] = 10):
     cursor = conn.cursor()
     
     # Crea il text splitter appropriato
-    splitter = create_text_splitter(
-        config,
-        embeddings_function=embedding.get_embedding if config.strategy == ChunkingStrategy.SEMANTIC else None
-    )
+    splitter = create_text_splitter(config)
     
     # Query per ottenere i file da processare e i relativi metadati
     limit_clause = f"top {limit}" if limit else ""
@@ -257,22 +253,22 @@ def main():
     # ESEMPIO 1: FIXED-SIZE
     config_fixed = ChunkingConfig(
         strategy=ChunkingStrategy.FIXED_SIZE,
-        chunk_size=512,
-        chunk_overlap=100
+        chunk_size=1024,
+        chunk_overlap=150
     )
     
     # ESEMPIO 2: RECURSIVE
     config_recursive = ChunkingConfig(
         strategy=ChunkingStrategy.RECURSIVE,
         chunk_size=1024,
-        chunk_overlap=105
+        chunk_overlap=150
     )
     
 
     # SCEGLI LA CONFIGURAZIONE DA USARE
 
     selected_config = config_recursive
-    limit = 1  # Numero max di file da elaborare
+    limit = 300 # Numero max di file da elaborare
     process_files(selected_config, limit)
 
 
