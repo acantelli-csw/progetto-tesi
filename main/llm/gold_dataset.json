@@ -1,0 +1,71 @@
+[
+  {
+    "query_id": "q001",
+    "query_text": "Mi serve sapere se info@gmrenlights.com è l’e-mail giusta per contattare GMR ENLIGHTS S.R.L. per la richiesta implementazione che riguarda il tasto link BPM nella griglia azioni, perché devo inviare aggiornamenti e non voglio sbagliare indirizzo, puoi confermare? Chi è la persona di riferimento per il cliente?",
+    "relevant_chunk_ids": [
+      "56076_0"
+    ],
+    "reference_answer": "Sì, info@gmrenlights.com è indicata come l’e-mail di GMR ENLIGHTS S.R.L. nel contesto della richiesta di implementazione n° 56076 e il riferimento del cliente è Daniele Valentini."
+  },
+  {
+    "query_id": "q002",
+    "query_text": "In che modo l'automazione dei processi contabili e la gestione automatizzata delle scritture vengono implementate tramite il ribaltamento in contabilità analitica e il lancio delle ripartizioni mensili extracontabili?",
+    "relevant_chunk_ids": [
+      "55459_2",
+      "55459_3",
+      "55459_1",
+      "55459_4",
+      "55459_5"
+    ],
+    "reference_answer": "L'automazione dei processi contabili e la gestione automatizzata delle scritture sono implementate attraverso il ribaltamento in contabilità analitica, dove al salvataggio della registrazione il sistema apre la maschera della contabilità analitica e permette all'utente di ribaltare la scrittura su più centri di costo compilando il campo Riferi1. Inoltre, tramite il lancio delle ripartizioni mensili extracontabili, il sistema genera automaticamente registrazioni di prima nota extracontabile in base al periodo di competenza, storna il conto di partenza, apre il conto Ripartizione e suddivide il costo totale proporzionalmente ai giorni di competenza, riflettendo queste operazioni anche sulla prima nota analitica."
+  },
+  {
+    "query_id": "q003",
+    "query_text": "Come si gestisce la relazione tra Area Manager e agenti per la visibilità dei contatti e delle opportunità nel portale CRM, considerando le regole specifiche per il profilo Area Manager?",
+    "relevant_chunk_ids": [
+      "55002_1",
+      "55002_3",
+      "55002_5",
+      "55002_0"
+    ],
+    "reference_answer": "La relazione tra Area Manager e agenti viene gestita tramite una tabella che riporta le associazioni tra Agente (utente web), Direttore Commerciale (utente web) e Zona (tabella Regione), includendo anche l'informazione Area Manager. Per il profilo Area Manager, le regole di visibilità prevedono che l'Area Manager possa visualizzare tutti i contatti degli agenti a lui associati e tutti i contatti delle zone a lui associate. Inoltre, l'Area Manager può vedere le opportunità degli agenti a lui associati (quando gli agenti sono indicati come proprietario, Agente 1 o Agente 2) e le opportunità delle zone a lui associate. Queste relazioni e regole sono gestite a livello di database e non richiedono un'interfaccia dedicata in questa fase."
+  },
+  {
+    "query_id": "q004",
+    "query_text": "Come si fa ad usare il file di configurazione per schedulare job di importazione e anche per attivare personalizzazioni esterne quando si importa file di testo usando tracciato XML? spiegami come funziona tutto insieme, tipo dove si mette nome del plug-in e come si fa a far partire operazioni specifiche, e come il file di configurazione serve sia per la sequenza dei job che per le personalizzazioni.",
+    "relevant_chunk_ids": [
+      "55749_3",
+      "55749_9",
+      "55749_4",
+      "55749_1",
+      "55749_8",
+      "55749_7",
+      "55749_1",
+      "55749_3",
+      "55749_2",
+      "55749_9",
+      "55749_4",
+      "55749_8"
+    ],
+    "reference_answer": "Per usare file di configurazione per schedulare job di importazione, l’applicazione esegue in sequenza i Job richiesti secondo le modalità indicate nel file di configurazione; quindi, il file di configurazione dice come e quando partono i job. Poi, se si vuole attivare personalizzazioni esterne quando si importa il file di testo usando tracciato XML, bisogna mettere nel file di configurazione del tracciato XML il nome del plug-in e il nome delle funzioni da eseguire. Così, quando si importa, si possono fare operazioni specifiche come modificare dati del file di testo, cambiare valori nella tabella temporanea, o fare cose dopo il salvataggio del file XML. Quindi il file di configurazione serve sia per dire la sequenza dei job schedulati che per attivare personalizzazioni esterne, basta mettere le informazioni giuste dentro."
+  },
+  {
+    "query_id": "q005",
+    "query_text": "Mi spieghi come funziona l’importazione file excel per le paghe? Se io ho un file excel con colonne diverse, tipo una colonna per il conto contabile e poi importi separati dare e avere, il plugin riesce a generare la scrittura contabile automatica? E se invece il file ha solo una colonna importo e una segno D/A, cambia qualcosa nell’importazione payroll?",
+    "relevant_chunk_ids": [
+      "51901_0",
+      "54803_0",
+      "38117_1",
+      "54803_1",
+      "54803_2",
+      "51901_1",
+      "50858_1",
+      "50858_6",
+      "38117_2",
+      "38117_4",
+      "50858_9",
+      "51901_3"
+    ],
+    "reference_answer": "L’importazione del file Excel per le paghe permette di generare automaticamente la scrittura contabile degli stipendi e l’imputazione ai centri di costo collegati. Secondo le specifiche, il plugin può importare due file Excel prodotti dal consulente esterno per creare scritture contabili ed extra-contabili. Se il file Excel ha una colonna per il conto contabile e importi separati su due colonne (una per il dare e una per l’avere), il sistema gestisce questa situazione come descritto nella richiesta RI 54215. Se invece il file ha una sola colonna per l’importo e una colonna per il segno D/A, anche questa configurazione viene gestita dal plugin, che riconosce il segno per determinare se l’importo va in dare o avere. In entrambi i casi, l’importazione payroll viene adattata alla struttura del file Excel fornito, garantendo la generazione automatica delle scritture contabili."
+  }
+]

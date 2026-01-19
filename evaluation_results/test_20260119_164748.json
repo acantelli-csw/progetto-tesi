@@ -1,0 +1,144 @@
+{
+  "test_id": "test_20260119_164748",
+  "timestamp": "2026-01-19T16:47:48.505769",
+  "configuration": {
+    "name": "Test Hybrid Search",
+    "search_strategy": "hybrid",
+    "semantic_weight": 0.7,
+    "keyword_weight": 0.3,
+    "llm_model": "gpt-4o-mini",
+    "top_k": 5,
+    "note": "Combinazione semantic (70%) + keyword (30%)"
+  },
+  "retrieval_metrics": {
+    "avg_precision_at_1": 0.8,
+    "avg_recall_at_1": 0.30666666666666664,
+    "avg_precision_at_3": 0.5333333333333333,
+    "avg_recall_at_3": 0.42000000000000004,
+    "avg_precision_at_5": 0.44000000000000006,
+    "avg_recall_at_5": 0.5033333333333333,
+    "avg_precision_at_10": 0.22000000000000003,
+    "avg_recall_at_10": 0.5033333333333333,
+    "avg_avg_chunk_relevance_top5": 0.76,
+    "avg_retrieval_time": 1.1653587341308593
+  },
+  "generation_metrics": {
+    "avg_faithfulness": 0.7,
+    "avg_answer_relevancy": 1.0,
+    "avg_semantic_similarity": 0.9244841995160684,
+    "avg_generation_time": 5.282660913467407
+  },
+  "per_query_details": [
+    {
+      "query_id": "q001",
+      "query_text": "Mi serve sapere se info@gmrenlights.com è l’e-mail giusta per contattare GMR ENLIGHTS S.R.L. per la richiesta implementazione che riguarda il tasto link BPM nella griglia azioni, perché devo inviare aggiornamenti e non voglio sbagliare indirizzo, puoi confermare? Chi è la persona di riferimento per il cliente?",
+      "retrieval_metrics": {
+        "precision_at_1": 1.0,
+        "recall_at_1": 1.0,
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 1.0,
+        "precision_at_5": 0.2,
+        "recall_at_5": 1.0,
+        "precision_at_10": 0.1,
+        "recall_at_10": 1.0,
+        "avg_chunk_relevance_top5": 0.6,
+        "retrieval_time": 1.6061618328094482
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9139958731714843,
+        "generation_time": 2.5738022327423096
+      }
+    },
+    {
+      "query_id": "q002",
+      "query_text": "In che modo l'automazione dei processi contabili e la gestione automatizzata delle scritture vengono implementate tramite il ribaltamento in contabilità analitica e il lancio delle ripartizioni mensili extracontabili?",
+      "retrieval_metrics": {
+        "precision_at_1": 1.0,
+        "recall_at_1": 0.2,
+        "precision_at_3": 1.0,
+        "recall_at_3": 0.6,
+        "precision_at_5": 0.6,
+        "recall_at_5": 0.6,
+        "precision_at_10": 0.3,
+        "recall_at_10": 0.6,
+        "avg_chunk_relevance_top5": 0.7,
+        "retrieval_time": 1.3036582469940186
+      },
+      "generation_metrics": {
+        "faithfulness": 0.5,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9248782566565497,
+        "generation_time": 5.426259279251099
+      }
+    },
+    {
+      "query_id": "q003",
+      "query_text": "Come si gestisce la relazione tra Area Manager e agenti per la visibilità dei contatti e delle opportunità nel portale CRM, considerando le regole specifiche per il profilo Area Manager?",
+      "retrieval_metrics": {
+        "precision_at_1": 1.0,
+        "recall_at_1": 0.25,
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.25,
+        "precision_at_5": 0.4,
+        "recall_at_5": 0.5,
+        "precision_at_10": 0.2,
+        "recall_at_10": 0.5,
+        "avg_chunk_relevance_top5": 0.9,
+        "retrieval_time": 0.989055871963501
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.92779955052905,
+        "generation_time": 5.991243839263916
+      }
+    },
+    {
+      "query_id": "q004",
+      "query_text": "Come si fa ad usare il file di configurazione per schedulare job di importazione e anche per attivare personalizzazioni esterne quando si importa file di testo usando tracciato XML? spiegami come funziona tutto insieme, tipo dove si mette nome del plug-in e come si fa a far partire operazioni specifiche, e come il file di configurazione serve sia per la sequenza dei job che per le personalizzazioni.",
+      "retrieval_metrics": {
+        "precision_at_1": 0.0,
+        "recall_at_1": 0.0,
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.0,
+        "recall_at_5": 0.0,
+        "precision_at_10": 0.0,
+        "recall_at_10": 0.0,
+        "avg_chunk_relevance_top5": 1.0,
+        "retrieval_time": 0.9782319068908691
+      },
+      "generation_metrics": {
+        "faithfulness": 0.5,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9350122390998504,
+        "generation_time": 5.996543884277344
+      }
+    },
+    {
+      "query_id": "q005",
+      "query_text": "Mi spieghi come funziona l’importazione file excel per le paghe? Se io ho un file excel con colonne diverse, tipo una colonna per il conto contabile e poi importi separati dare e avere, il plugin riesce a generare la scrittura contabile automatica? E se invece il file ha solo una colonna importo e una segno D/A, cambia qualcosa nell’importazione payroll?",
+      "retrieval_metrics": {
+        "precision_at_1": 1.0,
+        "recall_at_1": 0.08333333333333333,
+        "precision_at_3": 1.0,
+        "recall_at_3": 0.25,
+        "precision_at_5": 1.0,
+        "recall_at_5": 0.4166666666666667,
+        "precision_at_10": 0.5,
+        "recall_at_10": 0.4166666666666667,
+        "avg_chunk_relevance_top5": 0.6,
+        "retrieval_time": 0.94968581199646
+      },
+      "generation_metrics": {
+        "faithfulness": 0.5,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9207350781234077,
+        "generation_time": 6.425455331802368
+      }
+    }
+  ],
+  "total_evaluation_time": 40.13298726081848
+}

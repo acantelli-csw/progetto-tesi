@@ -30,7 +30,8 @@ dependencies = [
     "llama_index",
     "six==1.16.0",
     "rapidfuzz",
-    "langchain_experimental"    
+    "langchain_experimental",
+    "numpy"   
 ]
 
 [build-system]
