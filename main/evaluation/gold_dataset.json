@@ -1,4 +1,18 @@
 [
+    {
+    "query_id": "q000",
+    "query_text": "Mi serve sapere se info@gmrenlights.com è l’e-mail giusta per contattare GMR ENLIGHTS S.R.L. per la richiesta implementazione che riguarda il tasto link BPM nella griglia azioni, perché devo inviare aggiornamenti e non voglio sbagliare indirizzo, puoi confermare? Chi è la persona di riferimento per il cliente?",
+    "relevant_chunk_ids": [
+      "55002_0",
+      "55459_0",
+      "54803_0",
+      "54507_0",
+      "56071_0",
+      "56076_0"
+    ],
+    "reference_answer": "Questi sono i plugin implementati per GMR ENLIGHTS S.R.L.:\n•\tPortale CRM1 - Regole di visibilità di contatti e opportunità\n•\tCompilazione automatica del campo Riferi1 di prima nota su registrazioni di ripartizioni mensili derivanti da contabilità analitica\n•\tNuove richieste POW CRM1 Custom Configuratore\n•\tLINK AZIONIE VS BPM\n•\tNuove richieste POW CRM1 Custom Configuratore\n•\tProvvigioni Francia - modifica algoritmo calcolo provvigione"
+  },
+
   {
     "query_id": "q001",
     "query_text": "Mi serve sapere se info@gmrenlights.com è l’e-mail giusta per contattare GMR ENLIGHTS S.R.L. per la richiesta implementazione che riguarda il tasto link BPM nella griglia azioni, perché devo inviare aggiornamenti e non voglio sbagliare indirizzo, puoi confermare? Chi è la persona di riferimento per il cliente?",
@@ -7,6 +21,7 @@
     ],
     "reference_answer": "Sì, info@gmrenlights.com è indicata come l’e-mail di GMR ENLIGHTS S.R.L. nel contesto della richiesta di implementazione n° 56076 e il riferimento del cliente è Daniele Valentini."
   },
+
   {
     "query_id": "q002",
     "query_text": "In che modo l'automazione dei processi contabili e la gestione automatizzata delle scritture vengono implementate tramite il ribaltamento in contabilità analitica e il lancio delle ripartizioni mensili extracontabili?",

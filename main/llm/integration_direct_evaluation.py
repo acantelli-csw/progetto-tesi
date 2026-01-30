@@ -41,7 +41,7 @@ class SearchStrategy:
     KEYWORD = "keyword"    # BM25
     HYBRID = "hybrid"      # Combinazione di entrambi
 
-path = "C:/Users/ACantelli/OneDrive - centrosoftware.com/Documenti/GitHub/progetto-tesi/main/llm/gold_dataset.json"
+path = "C:/Users/ACantelli/OneDrive - centrosoftware.com/Documenti/GitHub/progetto-tesi/main/evaluation/gold_dataset.json"
 
 # ==================== ADAPTER PER RETRIEVAL ====================
 
