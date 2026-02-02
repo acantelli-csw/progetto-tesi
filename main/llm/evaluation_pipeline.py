@@ -1,0 +1,1044 @@
+"""
+PIPELINE UNIFICATA DI VALUTAZIONE SISTEMA RAG
+==============================================
+
+Pipeline completa per la valutazione quantitativa di sistemi RAG con:
+- Integrazione diretta con il sistema RAG esistente (search.py, llm.py)
+- Metriche di retrieval (Precision@k, Recall@k, LLM-as-judge)
+- Metriche di generation (Faithfulness, Answer Relevancy, Semantic Similarity)
+- Supporto per diverse strategie: Semantic, Keyword (BM25), Hybrid
+
+Tesi Magistrale in Ingegneria Informatica e dell'IA
+Autore: Andrea Cantelli
+Data: Gennaio 2026
+"""
+
+import os
+import json
+import time
+import sys
+from typing import List, Dict, Tuple, Optional
+from dataclasses import dataclass, asdict
+from pathlib import Path
+import numpy as np
+from datetime import datetime
+from openai import AzureOpenAI
+
+# Import del tuo sistema RAG esistente
+sys.path.append(os.path.dirname(__file__))
+import llm.search as search
+import llm.llm as your_llm
+
+
+# ==================== CONFIGURAZIONE ====================
+
+class SearchStrategy:
+    SEMANTIC = "semantic"  # Vector similarity
+    KEYWORD = "keyword"    # BM25
+    HYBRID = "hybrid"      # Combinazione di entrambi
+
+GOLD_DATASET_PATH = "C:/Users/ACantelli/OneDrive - centrosoftware.com/Documenti/GitHub/progetto-tesi/main/evaluation/gold_dataset.json"
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+EMBEDDING_MODEL_1 = os.getenv("EMBEDDING_MODEL_1")
+EMBEDDING_URL_1 = os.getenv("EMBEDDING_URL_1")
+EMBEDDING_VERSION_1 = os.getenv("EMBEDDING_VERSION_1")
+
+EMBEDDING_MODEL_2 = os.getenv("EMBEDDING_MODEL_2")
+EMBEDDING_URL_2 = os.getenv("EMBEDDING_URL_2")
+EMBEDDING_VERSION_2 = os.getenv("EMBEDDING_VERSION_2")
+
+LLM_MODEL = os.getenv("LLM_MODEL")
+LLM_URL = os.getenv("LLM_URL")
+LLM_VERSION = os.getenv("LLM_VERSION")
+
+# ==================== STRUTTURE DATI ====================
+
+@dataclass
+class EvaluationQuery:
+    """Query del dataset GOLD con ground truth."""
+    query_id: str
+    query_text: str
+    relevant_chunk_ids: List[str]
+    reference_answer: Optional[str] = None
+
+@dataclass
+class RetrievalResult:
+    """Risultato del retrieval per una query."""
+    query_id: str
+    retrieved_chunk_ids: List[str]
+    retrieved_chunk_texts: List[str]
+    retrieval_time: float
+
+@dataclass
+class GenerationResult:
+    """Risultato della generation per una query."""
+    query_id: str
+    generated_answer: str
+    context_chunks: List[str]
+    generation_time: float
+
+@dataclass
+class TestResult:
+    """Risultato completo di un test con una specifica configurazione."""
+    test_id: str
+    timestamp: str
+    configuration: Dict
+    retrieval_metrics: Dict[str, float]
+    generation_metrics: Dict[str, float]
+    per_query_details: List[Dict]
+    total_evaluation_time: float
+
+
+# ==================== FUNZIONI DI UTILITÀ ====================
+
+# Carica il client AzureOpenAI
+def load_openai_client(api_key: Optional[str] = None) -> AzureOpenAI:
+
+    client = AzureOpenAI(
+        azure_endpoint=os.getenv("LLM_URL"),
+        api_key=os.getenv("OPENAI_API_KEY"),
+        api_version=os.getenv("LLM_VERSION")
+    )
+    return client
+
+# Calcola la similarità coseno tra due vettori
+def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
+    vec1_np = np.array(vec1)
+    vec2_np = np.array(vec2)
+    return float(np.dot(vec1_np, vec2_np) / (np.linalg.norm(vec1_np) * np.linalg.norm(vec2_np)))
+
+# Carica il dataset GOLD da file JSON
+def load_gold_dataset(filepath: str) -> List[EvaluationQuery]:
+    
+    with open(filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    queries = []
+    for item in data:
+        query = EvaluationQuery(
+            query_id=item['query_id'],
+            query_text=item['query_text'],
+            relevant_chunk_ids=item['relevant_chunk_ids'],
+            reference_answer=item.get('reference_answer')
+        )
+        queries.append(query)
+    
+    return queries
+
+
+# ==================== METRICHE DI RETRIEVAL ====================
+# TODO: valutarle su span di testo invece che chunk
+
+# Calcola Precision@k - Formula: P@k = (N° documenti rilevanti nei top-k) / k
+def calculate_precision_at_k(
+    retrieved_ids: List[str],
+    relevant_ids: List[str],
+    k: int
+) -> float:
+
+    if k == 0 or len(retrieved_ids) == 0:
+        return 0.0
+    
+    top_k = retrieved_ids[:k]
+    relevant_in_top_k = sum(1 for doc_id in top_k if doc_id in relevant_ids)
+
+    return relevant_in_top_k / k
+
+# Calcola Recall@k - Formula: R@k = (N° documenti rilevanti nei top-k) / (Totale documenti rilevanti)
+def calculate_recall_at_k(
+    retrieved_ids: List[str],
+    relevant_ids: List[str],
+    k: int
+) -> float:
+    
+    if len(relevant_ids) == 0:
+        return 0.0
+    
+    top_k = retrieved_ids[:k]
+    relevant_in_top_k = sum(1 for doc_id in top_k if doc_id in relevant_ids)
+    
+    return relevant_in_top_k / len(relevant_ids)
+
+# Valuta la rilevanza di un singolo chunk rispetto a una query usando LLM-as-judge
+def evaluate_chunk_relevance_with_llm(
+    query: str,
+    chunk_text: str,
+    client: AzureOpenAI,
+    model: str = "gpt-4o-mini"
+) -> float:
+
+    prompt = f"""Sei un valutatore di rilevanza per sistemi di retrieval.
+                Dato:
+                - Query utente: "{query}"
+                - Chunk di documento: "{chunk_text}"
+
+                Valuta se questo chunk è rilevante per rispondere alla query.
+
+                Rispondi SOLO con un numero tra 0 e 1, dove:
+                - 0.0 = completamente irrilevante
+                - 0.5 = parzialmente rilevante
+                - 1.0 = altamente rilevante
+
+                Risposta (solo numero):"""
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=10
+        )
+        
+        score_text = response.choices[0].message.content.strip()
+        score = float(score_text)
+        return max(0.0, min(1.0, score))
+        
+    except Exception as e:
+        print(f"Errore valutazione LLM chunk: {e}")
+        return 0.0
+
+# Calcola la rilevanza media dei chunk recuperati usando LLM-as-judge
+def calculate_average_chunk_relevance(
+    query: str,
+    retrieved_chunks: List[str],
+    client: AzureOpenAI,
+    model: str = "gpt-4o-mini",
+    top_k: Optional[int] = None
+) -> float:
+    
+    chunks_to_evaluate = retrieved_chunks[:top_k] if top_k else retrieved_chunks
+    
+    if not chunks_to_evaluate:
+        return 0.0
+    
+    relevance_scores = []
+    for chunk in chunks_to_evaluate:
+        score = evaluate_chunk_relevance_with_llm(query, chunk, client, model)
+        relevance_scores.append(score)
+    
+    return float(np.mean(relevance_scores))
+
+# Valuta il retrieval per una singola query usando varie metriche
+def evaluate_retrieval_for_query(
+    query: EvaluationQuery,
+    retrieval_result: RetrievalResult,
+    client: AzureOpenAI,
+    k_values: List[int] = [1, 3, 5, 10],
+    llm_model: str = "gpt-4o-mini"
+) -> Dict[str, float]:
+
+    metrics = {}
+    
+    # Precision e Recall per diversi k
+    for k in k_values:
+        metrics[f"precision_at_{k}"] = calculate_precision_at_k(
+            retrieval_result.retrieved_chunk_ids,
+            query.relevant_chunk_ids,
+            k
+        )
+        metrics[f"recall_at_{k}"] = calculate_recall_at_k(
+            retrieval_result.retrieved_chunk_ids,
+            query.relevant_chunk_ids,
+            k
+        )
+    
+    # LLM-as-judge chunk relevance per diversi k
+    for k in k_values:
+        avg_relevance = calculate_average_chunk_relevance(
+            query.query_text,
+            retrieval_result.retrieved_chunk_texts,
+            client,
+            llm_model,
+            top_k=k
+        )
+        metrics[f"avg_chunk_relevance_top{k}"] = avg_relevance
+    
+    # Retrieval time
+    metrics["retrieval_time"] = retrieval_result.retrieval_time
+    
+    return metrics
+
+
+# ==================== METRICHE DI GENERATION ====================
+
+# Valuta la faithfulness (fedeltà) della risposta generata rispetto al contesto
+def evaluate_faithfulness_with_llm(
+    context_chunks: List[str],
+    generated_answer: str,
+    client: AzureOpenAI,
+    model: str = "gpt-4o-mini"
+) -> float:
+
+    context_text = "\n\n".join(context_chunks)
+    
+    prompt = f"""Sei un valutatore di fedeltà per sistemi RAG.
+
+                Dato:
+                - CONTESTO (dai documenti):
+                {context_text}
+
+                - RISPOSTA GENERATA:
+                {generated_answer}
+
+                Valuta se la risposta è FEDELE al contesto, cioè se tutte le informazioni nella risposta sono supportate dal contesto fornito.
+
+                Rispondi SOLO con un numero tra 0 e 1, dove:
+                - 0.0 = risposta completamente infedele (inventa informazioni)
+                - 0.5 = risposta parzialmente fedele
+                - 1.0 = risposta completamente fedele (tutte le info sono nel contesto)
+
+                Risposta (solo numero):"""
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=10
+        )
+        
+        score_text = response.choices[0].message.content.strip()
+        score = float(score_text)
+        return max(0.0, min(1.0, score))
+        
+    except Exception as e:
+        print(f"Errore valutazione faithfulness: {e}")
+        return 0.0
+
+# Valuta la relevancy (rilevanza) della risposta rispetto alla query
+def evaluate_answer_relevancy_with_llm(
+    query: str,
+    generated_answer: str,
+    client: AzureOpenAI,
+    model: str = "gpt-4o-mini"
+) -> float:
+
+    prompt = f"""Sei un valutatore di rilevanza per risposte generate.
+
+                Dato:
+                - QUERY UTENTE: "{query}"
+                - RISPOSTA: "{generated_answer}"
+
+                Valuta se la risposta è RILEVANTE per la query, cioè se risponde effettivamente alla domanda posta.
+
+                Rispondi SOLO con un numero tra 0 e 1, dove:
+                - 0.0 = risposta completamente irrilevante
+                - 0.5 = risposta parzialmente rilevante
+                - 1.0 = risposta perfettamente rilevante
+
+                Risposta (solo numero):"""
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=10
+        )
+        
+        score_text = response.choices[0].message.content.strip()
+        score = float(score_text)
+        return max(0.0, min(1.0, score))
+        
+    except Exception as e:
+        print(f"Errore valutazione answer relevancy: {e}")
+        return 0.0
+
+# Calcola la similarità semantica tra risposta di riferimento e risposta generata come metrica
+def calculate_semantic_similarity_embeddings(
+    reference_answer: str,
+    generated_answer: str,
+    client: AzureOpenAI,
+    embedding_model: str = "text-embedding-3-large"
+) -> float:
+
+    try:
+        # Genera embeddings per entrambe le risposte
+        response_ref = client.embeddings.create(
+            model=embedding_model,
+            input=reference_answer
+        )
+        embedding_ref = response_ref.data[0].embedding
+        
+        response_gen = client.embeddings.create(
+            model=embedding_model,
+            input=generated_answer
+        )
+        embedding_gen = response_gen.data[0].embedding
+        
+        return cosine_similarity(embedding_ref, embedding_gen)
+        
+    except Exception as e:
+        print(f"Errore calcolo semantic similarity: {e}")
+        return 0.0
+
+# Valuta la generation per una singola query usando varie metriche
+def evaluate_generation_for_query(
+    query: EvaluationQuery,
+    generation_result: GenerationResult,
+    client: AzureOpenAI,
+    llm_model: str = "gpt-4o-mini",
+    embedding_model: str = "text-embedding-3-large"
+) -> Dict[str, float]:
+   
+    metrics = {}
+    
+    # Faithfulness
+    metrics["faithfulness"] = evaluate_faithfulness_with_llm(
+        generation_result.context_chunks,
+        generation_result.generated_answer,
+        client,
+        llm_model
+    )
+    
+    # Answer Relevancy
+    metrics["answer_relevancy"] = evaluate_answer_relevancy_with_llm(
+        query.query_text,
+        generation_result.generated_answer,
+        client,
+        llm_model
+    )
+    
+    # Semantic Similarity
+    if query.reference_answer:
+        metrics["semantic_similarity"] = calculate_semantic_similarity_embeddings(
+            query.reference_answer,
+            generation_result.generated_answer,
+            client,
+            embedding_model
+        )
+    else:
+        metrics["semantic_similarity"] = None
+    
+    # Generation time
+    metrics["generation_time"] = generation_result.generation_time
+    
+    return metrics
+
+
+# ==================== AGGREGAZIONE METRICHE ====================
+def aggregate_retrieval_metrics(per_query_metrics: List[Dict[str, float]]) -> Dict[str, float]:
+    if not per_query_metrics:
+        return {}
+    
+    # Estrai tutte le chiavi di metrica
+    metric_keys = set()
+    for metrics in per_query_metrics:
+        metric_keys.update(metrics.keys())
+    
+    # Calcola media per ogni metrica
+    aggregated = {}
+    for key in metric_keys:
+        values = [m[key] for m in per_query_metrics if key in m and m[key] is not None]
+        if values:
+            aggregated[f"avg_{key}"] = float(np.mean(values))
+    
+    return aggregated
+
+def aggregate_generation_metrics(per_query_metrics: List[Dict[str, float]]) -> Dict[str, float]:
+    if not per_query_metrics:
+        return {}
+    
+    # Estrai tutte le chiavi di metrica
+    metric_keys = set()
+    for metrics in per_query_metrics:
+        metric_keys.update(metrics.keys())
+    
+    # Calcola media per ogni metrica
+    aggregated = {}
+    for key in metric_keys:
+        values = [m[key] for m in per_query_metrics if key in m and m[key] is not None]
+        if values:
+            aggregated[f"avg_{key}"] = float(np.mean(values))
+    
+    return aggregated
+
+
+# ==================== INTEGRAZIONE CON SISTEMA RAG ESISTENTE ====================
+
+# Esegue retrieval usando la funzione semantic_search()
+def run_retrieval_with_semantic_search(
+    queries: List[EvaluationQuery],
+    top_k: int = 10
+) -> List[RetrievalResult]:
+
+    retrieval_results = []
+    
+    print(f"\n{'='*70}")
+    print(f"RETRIEVAL SEMANTICO: {len(queries)} query")
+    print(f"{'='*70}\n")
+    
+    for i, query in enumerate(queries, 1):
+        print(f"[{i}/{len(queries)}] {query.query_text[:60]}...")
+        
+        start_time = time.time()
+        
+        try:
+            docs = search.semantic_search(
+                prompt=query.query_text,
+                top_n=top_k
+            )
+            
+            # Estrai ID e testi
+            retrieved_chunk_ids = [
+                f"{doc['numero']}_{doc['progressivo']}" 
+                for doc in docs
+            ]
+            retrieved_chunk_texts = [doc['content'] for doc in docs]
+            
+            print(f"  ✓ {len(retrieved_chunk_ids)} chunk recuperati tramite retrieval semantico")
+            
+        except Exception as e:
+            print(f"  ✗ Errore: {e}")
+            retrieved_chunk_ids = []
+            retrieved_chunk_texts = []
+        
+        retrieval_time = time.time() - start_time
+        
+        result = RetrievalResult(
+            query_id=query.query_id,
+            retrieved_chunk_ids=retrieved_chunk_ids,
+            retrieved_chunk_texts=retrieved_chunk_texts,
+            retrieval_time=retrieval_time
+        )
+        retrieval_results.append(result)
+    
+    print(f"\n{'='*70}\n")
+    return retrieval_results
+
+# Esegue retrieval usando la funzione keyword_search() (BM25)
+def run_retrieval_with_keyword_search(
+    queries: List[EvaluationQuery],
+    top_k: int = 10
+) -> List[RetrievalResult]:
+    
+    retrieval_results = []
+    
+    print(f"\n{'='*70}")
+    print(f"RETRIEVAL BM25: {len(queries)} query")
+    print(f"{'='*70}\n")
+    
+    for i, query in enumerate(queries, 1):
+        print(f"[{i}/{len(queries)}] {query.query_text[:60]}...")
+        
+        start_time = time.time()
+        
+        try:
+            docs = search.keyword_search(
+                prompt=query.query_text,
+                top_n=top_k,
+                language='italian'
+            )
+            
+            # Estrai ID e testi
+            retrieved_chunk_ids = [
+                f"{doc['numero']}_{doc['progressivo']}" 
+                for doc in docs
+            ]
+            retrieved_chunk_texts = [doc['content'] for doc in docs]
+            
+            print(f"  ✓ {len(retrieved_chunk_ids)} chunk recuperati tramite retrieval keyword")
+            
+        except Exception as e:
+            print(f"  ✗ Errore: {e}")
+            retrieved_chunk_ids = []
+            retrieved_chunk_texts = []
+        
+        retrieval_time = time.time() - start_time
+        
+        result = RetrievalResult(
+            query_id=query.query_id,
+            retrieved_chunk_ids=retrieved_chunk_ids,
+            retrieved_chunk_texts=retrieved_chunk_texts,
+            retrieval_time=retrieval_time
+        )
+        retrieval_results.append(result)
+    
+    print(f"\n{'='*70}\n")
+    return retrieval_results
+
+# Esegue retrieval ibrido: combina semantic e keyword search (semantic_weight per cambiare % impatto di ciascuna)
+def run_retrieval_hybrid(
+    queries: List[EvaluationQuery],
+    top_k: int = 10,
+    semantic_weight: float = 0.7
+) -> List[RetrievalResult]:
+    
+    retrieval_results = []
+    keyword_weight = 1.0 - semantic_weight
+    
+    print(f"\n{'='*70}")
+    print(f"RETRIEVAL IBRIDO: {len(queries)} query")
+    print(f"Pesi: Semantic={semantic_weight}, Keyword={keyword_weight}")
+    print(f"{'='*70}\n")
+    
+    for i, query in enumerate(queries, 1):
+        print(f"[{i}/{len(queries)}] {query.query_text[:60]}...")
+        
+        start_time = time.time()
+        
+        try:
+            semantic_docs = search.semantic_search(query.query_text, top_n=top_k*2)
+            keyword_docs = search.keyword_search(query.query_text, top_n=top_k*2)
+            
+            # Fonde risultati con weighted score
+            combined = {}
+            
+            for doc in semantic_docs:
+                chunk_id = f"{doc['numero']}_{doc['progressivo']}"
+                combined[chunk_id] = {
+                    'doc': doc,
+                    'score': doc['similarity'] * semantic_weight
+                }
+            
+            for doc in keyword_docs:
+                chunk_id = f"{doc['numero']}_{doc['progressivo']}"
+                # Normalizza BM25 score
+                norm_score = doc['score'] / (doc['score'] + 1)
+                
+                if chunk_id in combined:
+                    combined[chunk_id]['score'] += norm_score * keyword_weight
+                else:
+                    combined[chunk_id] = {
+                        'doc': doc,
+                        'score': norm_score * keyword_weight
+                    }
+            
+            # Ordina per score e prendi top_k
+            sorted_results = sorted(
+                combined.items(), 
+                key=lambda x: x[1]['score'], 
+                reverse=True
+            )[:top_k]
+            
+            retrieved_chunk_ids = [chunk_id for chunk_id, _ in sorted_results]
+            retrieved_chunk_texts = [data['doc']['content'] for _, data in sorted_results]
+            
+            print(f"  ✓ {len(retrieved_chunk_ids)} chunk recuperati tramite retrieval ibrido")
+            
+        except Exception as e:
+            print(f"  ✗ Errore: {e}")
+            retrieved_chunk_ids = []
+            retrieved_chunk_texts = []
+        
+        retrieval_time = time.time() - start_time
+        
+        result = RetrievalResult(
+            query_id=query.query_id,
+            retrieved_chunk_ids=retrieved_chunk_ids,
+            retrieved_chunk_texts=retrieved_chunk_texts,
+            retrieval_time=retrieval_time
+        )
+        retrieval_results.append(result)
+    
+    print(f"\n{'='*70}\n")
+    return retrieval_results
+
+# Esegue generation della risposta tramite LLM
+def run_generation_with_llm(
+    queries: List[EvaluationQuery],
+    retrieval_results: List[RetrievalResult],
+    llm_model: str = "gpt-4o-mini"
+) -> List[GenerationResult]:
+
+    generation_results = []
+    
+    print(f"\n{'='*70}")
+    print(f"GENERATION: {len(queries)} query")
+    print(f"{'='*70}\n")
+    
+    for i, (query, retrieval_result) in enumerate(zip(queries, retrieval_results), 1):
+        print(f"[{i}/{len(queries)}] {query.query_text[:60]}...")
+        
+        start_time = time.time()
+        
+        chunk_ids = retrieval_result.retrieved_chunk_ids
+        chunk_texts = retrieval_result.retrieved_chunk_texts
+        
+        try:
+            # Crea documenti fittizi con i chunk recuperati
+            fake_docs = []
+            for idx, (chunk_id, chunk_text) in enumerate(zip(chunk_ids, chunk_texts)):
+                # Parsing chunk_id "NumRI_Progressivo"
+                try:
+                    num_ri, progressivo = chunk_id.split('_')
+                except:
+                    num_ri, progressivo = "UNKNOWN", str(idx)
+                
+                fake_docs.append({
+                    'numero': num_ri,
+                    'progressivo': int(progressivo),
+                    'titolo': f"Documento {idx+1}",
+                    'autore': "Sistema",
+                    'cliente': "Test",
+                    'content': chunk_text
+                })
+            
+            answer = your_llm.generate_final_answer(
+                user_prompt=query.query_text,
+                selected_docs=fake_docs,
+                chat_history=[]
+            )
+            
+            print(f"  ✓ Risposta generata ({len(answer)} char)")
+            
+        except Exception as e:
+            print(f"  ✗ Errore: {e}")
+            import traceback
+            traceback.print_exc()
+            answer = f"[ERRORE] {str(e)}"
+        
+        generation_time = time.time() - start_time
+        
+        result = GenerationResult(
+            query_id=query.query_id,
+            generated_answer=answer,
+            context_chunks=chunk_texts,
+            generation_time=generation_time
+        )
+        generation_results.append(result)
+    
+    print(f"\n{'='*70}\n")
+    return generation_results
+
+
+# ==================== VALUTAZIONE COMPLETA ====================
+
+# Esegue la valutazione completa di retrieval e generation
+def run_full_evaluation(
+    gold_queries: List[EvaluationQuery],
+    retrieval_results: List[RetrievalResult],
+    generation_results: List[GenerationResult],
+    configuration: Dict,
+    client: AzureOpenAI,
+    k_values: List[int] = [1, 3, 5, 10],
+    llm_model: str = "gpt-4o-mini",
+    embedding_model: str = "text-embedding-3-large"
+) -> TestResult:
+
+    start_time = time.time()
+    
+    print("\n" + "="*70)
+    print("VALUTAZIONE METRICHE")
+    print("="*70)
+    
+    per_query_retrieval_metrics = []
+    per_query_generation_metrics = []
+    per_query_details = []
+    
+    total_queries = len(gold_queries)
+    
+    for i, (query, retrieval_result, generation_result) in enumerate(
+        zip(gold_queries, retrieval_results, generation_results), 1
+    ):
+        print(f"\n[{i}/{total_queries}] Valutazione query: {query.query_id}")
+        
+        # Valuta retrieval
+        print("  - Metriche retrieval...")
+        retrieval_metrics = evaluate_retrieval_for_query(
+            query, retrieval_result, client, k_values, llm_model
+        )
+        per_query_retrieval_metrics.append(retrieval_metrics)
+        
+        # Valuta generation
+        print("  - Metriche generation...")
+        generation_metrics = evaluate_generation_for_query(
+            query, generation_result, client, llm_model, embedding_model
+        )
+        per_query_generation_metrics.append(generation_metrics)
+        
+        # Salva dettagli per query
+        per_query_details.append({
+            "query_id": query.query_id,
+            "query_text": query.query_text,
+            "retrieval_metrics": retrieval_metrics,
+            "generation_metrics": generation_metrics,
+            "generated_answer": generation_result.generated_answer,
+            "retrieved_chunk_count": len(retrieval_result.retrieved_chunk_ids)
+        })
+        
+        print(f"  ✓ Query {query.query_id} completata")
+    
+    # Aggrega metriche
+    print("\n" + "="*70)
+    print("AGGREGAZIONE METRICHE")
+    print("="*70)
+    
+    aggregated_retrieval = aggregate_retrieval_metrics(per_query_retrieval_metrics)
+    aggregated_generation = aggregate_generation_metrics(per_query_generation_metrics)
+    
+    total_time = time.time() - start_time
+    
+    # Creazione risultato finale
+    test_result = TestResult(
+        test_id=f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        timestamp=datetime.now().isoformat(),
+        configuration=configuration,
+        retrieval_metrics=aggregated_retrieval,
+        generation_metrics=aggregated_generation,
+        per_query_details=per_query_details,
+        total_evaluation_time=total_time
+    )
+    
+    print(f"\n✓ Valutazione completata in {total_time:.2f}s")
+    print("="*70)
+    
+    return test_result
+
+
+# ==================== GESTIONE RISULTATI ====================
+
+# Salva il risultato del test in un file JSON
+def save_test_result(test_result: TestResult, output_dir: str = "evaluation_results"):
+
+    Path(output_dir).mkdir(exist_ok=True)
+    
+    filename = f"{test_result.test_id}.json"
+    filepath = Path(output_dir) / filename
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(asdict(test_result), f, indent=2, ensure_ascii=False)
+    
+    print(f"\n✓ Risultati salvati: {filepath}")
+
+def print_test_result(test_result: TestResult):
+
+    print("\n" + "="*70)
+    print(f"TEST REPORT: {test_result.test_id}")
+    print("="*70)
+    
+    print(f"\n📅 Timestamp: {test_result.timestamp}")
+    print(f"⏱️  Tempo totale: {test_result.total_evaluation_time:.2f}s")
+    
+    print("\n📋 CONFIGURAZIONE:")
+    for key, value in test_result.configuration.items():
+        print(f"  • {key}: {value}")
+    
+    print("\n📊 METRICHE RETRIEVAL:")
+    for metric, value in test_result.retrieval_metrics.items():
+        print(f"  • {metric}: {value:.4f}")
+    
+    print("\n📝 METRICHE GENERATION:")
+    for metric, value in test_result.generation_metrics.items():
+        print(f"  • {metric}: {value:.4f}")
+    
+    print("\n" + "="*70)
+
+# Genera una tabella comparativa di più risultati di test
+def compare_test_results(test_results: List[TestResult]):
+
+    if not test_results:
+        print("Nessun risultato da confrontare.")
+        return
+    
+    print("\n" + "="*120)
+    print("CONFRONTO RISULTATI TEST")
+    print("="*120)
+    
+    # Header
+    config_name_len = 40
+    print(f"\n{'Test / Config':<{config_name_len}} {'P@5':>8} {'R@5':>8} {'LLM-Rel':>8} {'Faith':>8} {'Relev':>8} {'SemSim':>8}")
+    print("-"*120)
+    
+    # Riga per ogni test
+    for result in test_results:
+        # Nome configurazione (truncated)
+        config_name = result.configuration.get('name', result.test_id)[:config_name_len-2]
+        
+        # Estrazione metriche
+        p5 = result.retrieval_metrics.get('avg_precision_at_5', 0.0)
+        r5 = result.retrieval_metrics.get('avg_recall_at_5', 0.0)
+        llm_rel = result.retrieval_metrics.get('avg_avg_chunk_relevance_top5', 0.0)
+        faith = result.generation_metrics.get('avg_faithfulness', 0.0)
+        relev = result.generation_metrics.get('avg_answer_relevancy', 0.0)
+        simsem = result.generation_metrics.get('avg_semantic_similarity', 0.0)
+        
+        print(f"{config_name:<{config_name_len}} {p5:>8.4f} {r5:>8.4f} {llm_rel:>8.4f} {faith:>8.4f} {relev:>8.4f} {simsem:>8.4f}")
+    
+    print("="*120)
+    print("\nLegenda:")
+    print("  P@5      = Precision at 5")
+    print("  R@5      = Recall at 5")
+    print("  LLM-Rel  = LLM-as-judge Chunk Relevance (avg top 5)")
+    print("  Faith    = Faithfulness (LLM-as-judge)")
+    print("  Relev    = Answer Relevancy (LLM-as-judge)")
+    print("  SemSim   = Semantic Similarity (embeddings)")
+    print()
+
+
+# ==================== TEST PRINCIPALE ====================
+
+# Test completo di valutazione
+def run_test_with_your_pipeline(
+    gold_dataset_path: str,
+    configuration: dict,
+    search_strategy: str = SearchStrategy.SEMANTIC,
+    results_dir: str = "evaluation_results"
+):
+
+    print("\n" + "="*70)
+    print(f"TEST: {configuration.get('name', 'Unnamed')}")
+    print(f"Search Strategy: {search_strategy}")
+    print("="*70)
+    
+    # 1. Carica dataset
+    print("\n[1/4] Caricamento dataset GOLD...")
+    gold_queries = load_gold_dataset(gold_dataset_path)
+    
+    # 2. Retrieval
+    print(f"\n[2/4] Retrieval con strategia: {search_strategy}...")
+    top_k = configuration.get('top_k', 10)
+    
+    if search_strategy == SearchStrategy.SEMANTIC:
+        retrieval_results = run_retrieval_with_semantic_search(gold_queries, top_k)
+    elif search_strategy == SearchStrategy.KEYWORD:
+        retrieval_results = run_retrieval_with_keyword_search(gold_queries, top_k)
+    elif search_strategy == SearchStrategy.HYBRID:
+        retrieval_results = run_retrieval_hybrid(gold_queries, top_k, semantic_weight=configuration.get('semantic_weight', 0.7)
+        )
+    else:
+        raise ValueError(f"Search strategy non valida: {search_strategy}")
+    
+    # 3. Generation
+    print("\n[3/4] Generation...")
+    generation_results = run_generation_with_llm(
+        gold_queries,
+        retrieval_results,
+        llm_model=configuration.get('llm_model', 'gpt-4o-mini')
+    )
+    
+    # 4. Valutazione
+    print("\n[4/4] Valutazione metriche...")
+    client = load_openai_client()
+    
+    test_result = run_full_evaluation(
+        gold_queries=gold_queries,
+        retrieval_results=retrieval_results,
+        generation_results=generation_results,
+        configuration=configuration,
+        client=client,
+        k_values=[1, 3, 5, 10],
+        llm_model="gpt-4o-mini",
+        embedding_model="text-embedding-3-large"
+    )
+    
+    print_test_result(test_result)
+    save_test_result(test_result, results_dir)
+    
+    return test_result
+
+
+# ==================== ESEMPI DI TEST ====================
+
+# Test con SOLO semantic search (vector similarity)
+def esempio_test_semantic_search():
+
+    configuration = {
+        "name": "Test Semantic Search",
+        "search_strategy": "semantic",
+        "embedding_model": "Azure OpenAI",
+        "llm_model": "gpt-4o-mini",
+        "top_k": 5,
+        "note": "Vector similarity con embeddings Azure"
+    }
+    
+    return run_test_with_your_pipeline(
+        gold_dataset_path=GOLD_DATASET_PATH,
+        configuration=configuration,
+        search_strategy=SearchStrategy.SEMANTIC
+    )
+
+# Test con SOLO keyword search (BM25)
+def esempio_test_keyword_search():
+
+    configuration = {
+        "name": "Test Keyword Search BM25",
+        "search_strategy": "keyword",
+        "llm_model": "gpt-4o-mini",
+        "top_k": 5,
+        "note": "BM25 keyword search con stemming italiano"
+    }
+    
+    return run_test_with_your_pipeline(
+        gold_dataset_path=GOLD_DATASET_PATH,
+        configuration=configuration,
+        search_strategy=SearchStrategy.KEYWORD
+    )
+
+# Test con ricerca IBRIDA (semantic + keyword)
+def esempio_test_hybrid_search():
+
+    configuration = {
+        "name": "Test Hybrid Search",
+        "search_strategy": "hybrid",
+        "semantic_weight": 0.7,
+        "keyword_weight": 0.3,
+        "llm_model": "gpt-4o-mini",
+        "top_k": 5,
+        "note": "Combinazione semantic (70%) + keyword (30%)"
+    }
+    
+    return run_test_with_your_pipeline(
+        gold_dataset_path=GOLD_DATASET_PATH,
+        configuration=configuration,
+        search_strategy=SearchStrategy.HYBRID
+    )
+
+# Confronto diretto delle 3 strategie di search
+def esempio_confronto_strategie():
+
+    print("\n" + "="*70)
+    print("CONFRONTO STRATEGIE DI SEARCH")
+    print("="*70)
+    
+    results = []
+    
+    # Test 1: Semantic
+    print("\n[TEST 1/3] Semantic Search...")
+    results.append(esempio_test_semantic_search())
+    
+    # Test 2: Keyword
+    print("\n[TEST 2/3] Keyword Search (BM25)...")
+    results.append(esempio_test_keyword_search())
+    
+    # Test 3: Hybrid
+    print("\n[TEST 3/3] Hybrid Search...")
+    results.append(esempio_test_hybrid_search())
+    
+    compare_test_results(results)
+
+
+# ==================== MAIN ====================
+
+def main():
+    """
+    Menu interattivo per scegliere il test da eseguire.
+    """
+    print("="*70)
+    print("PIPELINE UNIFICATA DI VALUTAZIONE SISTEMA RAG")
+    print("="*70)
+    
+    print("\nScegli il tipo di test:")
+    print("1. Semantic Search (vector similarity)")
+    print("2. Keyword Search (BM25)")
+    print("3. Hybrid Search (semantic + keyword)")
+    print("4. Confronto tutte le strategie")
+    
+    choice = input("\nSelezione (1-4): ").strip()
+    
+    if choice == "1":
+        esempio_test_semantic_search()
+    elif choice == "2":
+        esempio_test_keyword_search()
+    elif choice == "3":
+        esempio_test_hybrid_search()
+    elif choice == "4":
+        esempio_confronto_strategie()
+    else:
+        print("Selezione non valida")
+
+
+if __name__ == "__main__":
+    main()
