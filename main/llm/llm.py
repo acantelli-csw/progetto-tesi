@@ -128,7 +128,7 @@ def decide_tools(prompt: str) -> dict:
 def select_documents(user_prompt: str, chunks: list) -> dict:
     
     # Carico template
-    doc = Document("main/llm/Sample_RI.docx")
+    doc = Document("main/evaluation/Sample_RI.docx")
     template_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
 
     # Filtro i chunk simili al template
