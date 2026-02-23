@@ -17,7 +17,6 @@ from typing import List, Optional
 
 
 class ChunkingStrategy(Enum):
-    """Enum per le strategie di chunking disponibili"""
     FIXED_SIZE = "fixed"
     RECURSIVE = "recursive"
 

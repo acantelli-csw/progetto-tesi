@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI
 import json
 import os
-import search
+import llm.search as search
 import tiktoken
 from docx import Document
 from difflib import SequenceMatcher

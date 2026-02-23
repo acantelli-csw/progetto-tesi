@@ -23,11 +23,10 @@ from pathlib import Path
 import numpy as np
 from datetime import datetime
 from openai import AzureOpenAI
-
-# Import del tuo sistema RAG esistente
-sys.path.append(os.path.dirname(__file__))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import llm.search as search
 import llm.llm as your_llm
+from file_embedding.embedding import get_embedding
 
 
 # ==================== CONFIGURAZIONE ====================
@@ -350,28 +349,19 @@ def evaluate_answer_relevancy_with_llm(
 def calculate_semantic_similarity_embeddings(
     reference_answer: str,
     generated_answer: str,
-    client: AzureOpenAI,
-    embedding_model: str = "text-embedding-3-large"
 ) -> float:
 
     try:
         # Genera embeddings per entrambe le risposte
-        response_ref = client.embeddings.create(
-            model=embedding_model,
-            input=reference_answer
-        )
-        embedding_ref = response_ref.data[0].embedding
-        
-        response_gen = client.embeddings.create(
-            model=embedding_model,
-            input=generated_answer
-        )
-        embedding_gen = response_gen.data[0].embedding
-        
+        embedding_ref = get_embedding(reference_answer)
+        embedding_gen = get_embedding(generated_answer)
+
         return cosine_similarity(embedding_ref, embedding_gen)
         
     except Exception as e:
         print(f"Errore calcolo semantic similarity: {e}")
+        print(f"  - Reference answer type: {type(reference_answer)}, value: {reference_answer[:100] if reference_answer else 'None'}...")
+        print(f"  - Generated answer type: {type(generated_answer)}, value: {generated_answer[:100] if generated_answer else 'None'}...")
         return 0.0
 
 # Valuta la generation per una singola query usando varie metriche
@@ -405,9 +395,7 @@ def evaluate_generation_for_query(
     if query.reference_answer:
         metrics["semantic_similarity"] = calculate_semantic_similarity_embeddings(
             query.reference_answer,
-            generation_result.generated_answer,
-            client,
-            embedding_model
+            generation_result.generated_answer
         )
     else:
         metrics["semantic_similarity"] = None
@@ -681,8 +669,20 @@ def run_generation_with_llm(
                 selected_docs=fake_docs,
                 chat_history=[]
             )
-            
-            print(f"  ✓ Risposta generata ({len(answer)} char)")
+
+            # Gestisci generator
+            import types
+            if isinstance(answer, types.GeneratorType):
+                answer = ''.join(answer)
+                print(f"  ✓ Risposta generata (da stream): {len(answer)} char")
+            elif isinstance(answer, str):
+                print(f"  ✓ Risposta generata: {len(answer)} char")
+            else:
+                answer = str(answer)
+                print(f"  ⚠ Tipo inaspettato: {len(answer)} char")
+
+            if not answer or not answer.strip():
+                answer = "[RISPOSTA VUOTA]"
             
         except Exception as e:
             print(f"  ✗ Errore: {e}")
@@ -713,7 +713,7 @@ def run_full_evaluation(
     generation_results: List[GenerationResult],
     configuration: Dict,
     client: AzureOpenAI,
-    k_values: List[int] = [1, 3, 5, 10],
+    k_values: List[int] = [5, 10],
     llm_model: str = "gpt-4o-mini",
     embedding_model: str = "text-embedding-3-large"
 ) -> TestResult:
@@ -906,7 +906,7 @@ def run_test_with_your_pipeline(
     generation_results = run_generation_with_llm(
         gold_queries,
         retrieval_results,
-        llm_model=configuration.get('llm_model', 'gpt-4o-mini')
+        llm_model=configuration.get('llm_model', 'gpt-4-1')
     )
     
     # 4. Valutazione
@@ -919,7 +919,7 @@ def run_test_with_your_pipeline(
         generation_results=generation_results,
         configuration=configuration,
         client=client,
-        k_values=[1, 3, 5, 10],
+        k_values=[3, 5, 10],
         llm_model="gpt-4o-mini",
         embedding_model="text-embedding-3-large"
     )
@@ -938,9 +938,9 @@ def esempio_test_semantic_search():
     configuration = {
         "name": "Test Semantic Search",
         "search_strategy": "semantic",
-        "embedding_model": "Azure OpenAI",
-        "llm_model": "gpt-4o-mini",
-        "top_k": 5,
+        "embedding_model": EMBEDDING_MODEL_1,
+        "llm_model": "gpt-4.1",
+        "top_k": 7,
         "note": "Vector similarity con embeddings Azure"
     }
     
@@ -956,8 +956,8 @@ def esempio_test_keyword_search():
     configuration = {
         "name": "Test Keyword Search BM25",
         "search_strategy": "keyword",
-        "llm_model": "gpt-4o-mini",
-        "top_k": 5,
+        "llm_model": "gpt-4.1",
+        "top_k": 7,
         "note": "BM25 keyword search con stemming italiano"
     }
     
@@ -975,8 +975,9 @@ def esempio_test_hybrid_search():
         "search_strategy": "hybrid",
         "semantic_weight": 0.7,
         "keyword_weight": 0.3,
-        "llm_model": "gpt-4o-mini",
-        "top_k": 5,
+        "embedding_model": EMBEDDING_MODEL_1,
+        "llm_model": "gpt-4.1",
+        "top_k": 10,
         "note": "Combinazione semantic (70%) + keyword (30%)"
     }
     

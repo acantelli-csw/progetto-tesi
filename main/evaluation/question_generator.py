@@ -10,8 +10,8 @@ from ragas.llms import LangchainLLMWrapper
 from langchain_core.documents import Document
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from llama_index.core.schema import Document as LlamaDocument
-import search
-import llm
+import llm.search as search
+import llm.llm as llm
 
 # Carica le variabili d'ambiente
 load_dotenv()
