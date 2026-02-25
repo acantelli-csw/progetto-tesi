@@ -11,31 +11,21 @@ from file_embedding.embedding import get_embedding
 nltk.download('stopwords')
 
 def semantic_search(prompt, top_n=10):
+
     prompt_embedding = get_embedding(prompt)
     prompt_embedding_json = json.dumps(prompt_embedding)
-
-    # Query per calcolo similarità coseno direttamente nel DB
+  
     query = f"""
             DECLARE @prompt VECTOR(1536) = CAST('{prompt_embedding_json}' AS VECTOR(1536));
 
-            SELECT TOP (?)
-                ID,
-                NumRI,
-                Progressivo,
-                Cliente,
-                Titolo,
-                Autore,
-                Documento,
-                Url_doc,
-                Content,
-                Embedding,
+            SELECT TOP (?) ID, ... ,
                 1 - VECTOR_DISTANCE('cosine', Embedding, @prompt) AS Similarity
             FROM DocumentChunks
             ORDER BY Similarity DESC;
         """
-
     cursor = get_connection().cursor()
     cursor.execute(query, (top_n,))
+
     rows = cursor.fetchall()
 
     docs = []

@@ -25,30 +25,6 @@ MODEL_NAME = os.getenv("LLM_MODEL")
 # 1. DECISIONE TOOLS DA USARE =====================================================
 def decide_tools(prompt: str) -> dict:
 
-    system_message = """
-    Sei un assistente decisionale esperto del software gestionale SAM ERP2 dell'azienda Centro Software. 
-    Devi rispondere SOLO con una decisione su quali strumenti di ricerca usare per un prompt utente, 
-    basandoti sul tipo di richiesta e sulla pertinenza rispetto ai documenti contenenti le Richieste di Implementazione (RI) fatte dai clienti.
-
-    Considera quanto segue:
-    - Il software SAM ERP2 ha funzionalità standard note, e il modello conosce queste funzionalità.
-    - Le personalizzazioni e i plugin richiesti dai clienti sono invece contenuti nei documenti da ricercare.
-    - Per richieste su funzionalità standard, entrambe le ricerche (semantica e keyword) possono essere utili.
-    - Per richieste più generiche su plugin o personalizzazioni, la ricerca semantica aiuta a trovare anche concetti correlati,
-    mentre la ricerca per keyword permette di trovare riferimenti precisi ad aziende, clienti o tipologie di plugin nelle RI.
-
-    I due sistemi di ricerca:
-    1. Ricerca semantica: adatta per concetti generali, macro-argomenti o combinazioni di funzionalità.
-    2. Ricerca per keyword: adatta per termini specifici, nomi di moduli, aziende o funzionalità precise, in particolare plugin/customizzazioni.
-
-    Rispondi SEMPRE in formato JSON:
-    {
-        "use_semantic": True/False,
-        "use_keyword": True/False,
-        "reason": "<spiegazione breve della decisione, indicando se la richiesta riguarda standard, plugin o entrambe le tipologie>"
-    }
-    """
-
     examples = [
         {
             "prompt": "Come generare un report dettagliato delle vendite per cliente?",
@@ -92,13 +68,40 @@ def decide_tools(prompt: str) -> dict:
         }
     ]
 
-
-    # Costruisco il prompt few-shot
+    # Costruisco il few-shot prompt 
     few_shot_text = ""
     for ex in examples:
         few_shot_text += f"Prompt utente: {ex['prompt']}\nDecisione: {json.dumps(ex['decision'])}\n\n"
 
-    user_message = f"{few_shot_text}Prompt utente: {prompt}\nDecisione:"
+    # STEP 1
+    system_message = f"""
+    Sei un assistente decisionale esperto del software gestionale SAM ERP2 dell'azienda Centro Software. 
+    Devi rispondere SOLO con una decisione su quali strumenti di ricerca usare per un prompt utente, 
+    basandoti sul tipo di richiesta e sulla pertinenza rispetto ai documenti contenenti le Richieste di Implementazione (RI) fatte dai clienti.
+
+    Considera quanto segue:
+    - Il software SAM ERP2 ha funzionalità standard note, e il modello conosce queste funzionalità.
+    - Le personalizzazioni e i plugin richiesti dai clienti sono invece contenuti nei documenti da ricercare.
+    - Per richieste su funzionalità standard, entrambe le ricerche (semantica e keyword) possono essere utili.
+    - Per richieste più generiche su plugin o personalizzazioni, la ricerca semantica aiuta a trovare anche concetti correlati,
+    mentre la ricerca per keyword permette di trovare riferimenti precisi ad aziende, clienti o tipologie di plugin nelle RI.
+
+    I due sistemi di ricerca:
+    1. Ricerca semantica: adatta per concetti generali, macro-argomenti o combinazioni di funzionalità.
+    2. Ricerca per keyword: adatta per termini specifici, nomi di moduli, aziende o funzionalità precise, in particolare plugin/customizzazioni.
+
+    Rispondi SEMPRE in formato JSON:
+    {
+        "use_semantic": True/False,
+        "use_keyword": True/False,
+        "reason": "<spiegazione breve della decisione, indicando se la richiesta riguarda standard, plugin o entrambe le tipologie>"
+    }
+
+    Esempi di risposta attesa:
+    {few_shot_text}
+    """
+
+    user_message = f"Prompt utente: {prompt}\nDecisione:"
 
     response = client.chat.completions.create(
         model = MODEL_NAME,
@@ -127,11 +130,27 @@ def decide_tools(prompt: str) -> dict:
 # 2. SELEZIONE DOCUMENTI =====================================================
 def select_documents(user_prompt: str, chunks: list) -> dict:
     
+    # STEP 3a
+    # Rimozione duplicati segnalando importanza maggiore 
+    seen = {}
+    for doc in chunks:
+        key = (doc["numero"], doc["progressivo"])
+        if key not in seen:
+            seen[key] = doc
+        else:
+            existing = seen[key].get("retrieval_sources", [])
+            incoming = doc.get("retrieval_sources", [])
+            seen[key]["retrieval_sources"] = list(set(existing + incoming))
+            if doc.get("similarity", 0) > seen[key].get("similarity", 0):
+                seen[key]["similarity"] = doc["similarity"]
+    chunks = list(seen.values())
+
     # Carico template
     doc = Document("main/evaluation/Sample_RI.docx")
     template_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
 
-    # Filtro i chunk simili al template
+    # STEP 3b
+    # Filtro i chunk simili al template base
     documents = []
     removed_indices = []
     similarity_threshold=0.9
@@ -150,35 +169,7 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
             "reason": "Tutti i chunk sono simili al template di base e quindi non utili."
         }
 
-    system_message = """
-    Sei un assistente decisionale incaricato di filtrare documenti estratti da un sistema 
-    di ricerca per il software gestionale SAM ERP2 dell'azienda Centro Software. 
-    Devi identificare quali documenti tra quelli estratti sono strettamente utili per rispondere a una richiesta utente e coerenti
-    con essa nello specifico, tenendo sempre conto delle funzionalità standard e di quelle offerte solo tramite plugin/customizzazioni. 
-
-    Nota:
-    - La ricerca documentale restituisce sempre i top 25 documenti più rilevanti, ma non tutti sono effettivamente utili.
-    - Seleziona solo i documenti più coerenti con la richiesta dell'utente, fino ad un massimo di 15.
-    - Per ciascun documento è disponibile il contenuto e il valore di similarità coseno con il prompt utente.
-    Usa queste informazioni come guida, ma considera anche il contenuto reale in termini di utilità per la risposta e la coerenza con la domanda.
-    - Alcuni chunk potrebbero essere identici al template di base e quindi privi di utilità.
-
-    Criteri di rilevanza:
-    1. Un documento è rilevante se contiene informazioni concrete che aiutano a rispondere 
-    alla richiesta, sia su funzionalità standard che su plugin/customizzazioni.
-    2. Alcuni documenti possono essere solo moderatamente coerenti o riferirsi a plugin 
-    non pertinenti alla richiesta: questi vanno considerati non utili.
-    3. Considera la differenza tra standard e plugin: se il prompt riguarda una funzionalità standard, anche documenti 
-    sui plugin correlati possono essere utili, mentre se riguarda plugin specifici, concentrati sui documenti che li contengono.
-
-    Rispondi SEMPRE in formato JSON:
-    {
-        "relevant_docs": [indici dei documenti utili],
-        "irrelevant_docs": [indici dei documenti non utili],
-        "reason": "<breve spiegazione della decisione, indicando se la rilevanza dipende da standard, plugin o entrambe le tipologie>"
-    }
-    """
-
+    # STEP 4
     examples = [
         {
             "prompt": "Come posso generare un report dei movimenti di magazzino?",
@@ -239,8 +230,47 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
         docs_text = "\n".join([f"{i}: {d['titolo']} - {d['content']} (autore: {d['autore']}, cliente: {d['cliente']})" for i, d in enumerate(ex['documents'])])
         few_shot_text += f"Prompt utente: {ex['prompt']}\nDocumenti:\n{docs_text}\nDecisione: {json.dumps(ex['decision'])}\n\n"
 
+    system_message = f"""
+    Sei un assistente decisionale incaricato di filtrare e riordinare per rilevanza i documenti estratti da un sistema 
+    di ricerca per il software gestionale SAM ERP2 dell'azienda Centro Software. 
+    Devi identificare quali documenti tra quelli estratti sono strettamente utili per rispondere a una richiesta utente e coerenti
+    con essa nello specifico, tenendo sempre conto delle funzionalità standard e di quelle offerte solo tramite plugin/customizzazioni. 
+    Durante la classificazione e la creazione delle liste di indici, riordina gli indici dei documenti utili in ordine crescente di rilevanza, dal meno al più rilevante.
+
+    Nota:
+    - La ricerca documentale restituisce sempre i top 25 documenti più rilevanti, ma non tutti sono effettivamente utili.
+    - Seleziona solo i documenti più coerenti con la richiesta dell'utente, fino ad un massimo di 15.
+    - Per ciascun documento è disponibile il contenuto e il valore di similarità coseno con il prompt utente.
+    Usa queste informazioni come guida, ma considera anche il contenuto reale in termini di utilità per la risposta e la coerenza con la domanda.
+    - Alcuni chunk potrebbero essere identici al template di base e quindi privi di utilità.
+    - Se un documento riporta retrieval_sources: ["semantic", "keyword"], significa che è stato recuperato da entrambe le tecniche di ricerca: questo è un segnale forte di rilevanza e va considerato prioritario nella selezione.
+
+    Criteri di rilevanza:
+    1. Un documento è rilevante se contiene informazioni concrete che aiutano a rispondere 
+    alla richiesta, sia su funzionalità standard che su plugin/customizzazioni.
+    2. Alcuni documenti possono essere solo moderatamente coerenti o riferirsi a plugin 
+    non pertinenti alla richiesta: questi vanno considerati non utili.
+    3. Considera la differenza tra standard e plugin: se il prompt riguarda una funzionalità standard, anche documenti 
+    sui plugin correlati possono essere utili, mentre se riguarda plugin specifici, concentrati sui documenti che li contengono.
+
+    Rispondi SEMPRE in formato JSON:
+    {
+        "relevant_docs": [indici dei documenti utili],
+        "irrelevant_docs": [indici dei documenti non utili],
+        "reason": "<breve spiegazione della decisione, indicando se la rilevanza dipende da standard, plugin o entrambe le tipologie>"
+    }
+
+    Esempi di risposta attesa:
+    {few_shot_text}
+    """
+
     # Prompt utente per il modello con i chunk reali
-    docs_text = "\n".join([f"{i}: {d['titolo']} - {d['content']} (autore: {d['autore']}, cliente: {d['cliente']})" for i, d in enumerate(documents)])
+    docs_text = "\n".join([
+        f"{i}: {d['titolo']} - {d['content']} "
+        f"(autore: {d['autore']}, cliente: {d['cliente']}, "
+        f"sorgenti: {'+'.join(d.get('retrieval_sources', ['unknown']))})"
+        for i, d in enumerate(documents)
+    ])
     user_message = f"{few_shot_text}Prompt utente: {user_prompt}\nDocumenti:\n{docs_text}\nDecisione:"
 
     # Chiamata al modello
@@ -280,24 +310,12 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
 def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: list = None) -> str:
 
     context_text = "\n\n".join([
-        f"Numero RI: {d['numero']} - Titolo: {d['titolo']}, Chunk: {d['progressivo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" 
-        for d in selected_docs]) if selected_docs else "Nessun documento rilevante trovato."
-
-    system_message = """
-    Sei un assistente esperto del software gestionale SAM ERP2 dell'azienda Centro Software. 
-    Conosci le funzionalità standard del software e la distinzione tra funzioni native e plugin/customizzazioni sviluppate su richiesta dei clienti. 
-    Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti, integrando le tue conoscenze pregresse solo per distinguere cosa è standard e cosa è personalizzato. 
-
-    Regole:
-    1. Non inventare informazioni o dettagli che non sono nei documenti forniti. 
-    2. Se una funzionalità è standard e nota dal tuo modello, puoi chiarirlo, ma evidenzia sempre quando una funzionalità è invece un plugin o una personalizzazione basata su Richieste di implementazione (RI) fornite nei documenti.
-    3. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
-    4. Alla fine della risposta, fornire la lista dei documenti di riferimento usati. In questo formato ('numero'=41699 nell'esempio): 1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - 'titolo', Chunk: 'progressivo+1', Autore: 'autore', Cliente 'cliente'.
-    5. Mantieni la risposta chiara, strutturata e basata esclusivamente sui documenti forniti per quanto riguarda le personalizzazioni.
-    6. Se non vengono forniti documenti, rispondi in modo naturale e professionale, facendo riferimento solo alle funzionalità standard conosciute di SAM ERP2.
-    7. Genera l'output in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
-    """
-
+        f"Numero RI: {d['numero']} - Titolo: {d['titolo']}, Chunk: {d['progressivo']}, "
+        f"Autore: {d['autore']}, Cliente: {d['cliente']}, "
+        f"Sorgenti retrieval: {'+'.join(d.get('retrieval_sources', ['unknown']))}\n"
+        f" - Contenuto: {d['content']}"
+        for d in selected_docs
+    ]) if selected_docs else "Nessun documento rilevante trovato."
 
     examples = [
         {
@@ -387,23 +405,38 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
         }
     ]
 
-
     few_shot_text = ""
     for ex in examples:
         docs_text_example = "\n".join([f"{i+1}: Numero RI: {d['numero']} - Titolo: {d['titolo']}, Autore: {d['autore']}, Cliente: {d['cliente']}\n - Contenuto: {d['content']}" for i, d in enumerate(ex['documents'])
         ])
         few_shot_text += f"Prompt utente: {ex['user_prompt']}\nDocumenti:\n{docs_text_example}\nRisposta attesa:\n{ex['answer']}\n\n"
 
+    system_message = f"""
+    Sei un assistente esperto del software gestionale SAM ERP2 dell'azienda Centro Software. 
+    Conosci le funzionalità standard del software e la distinzione tra funzioni native e plugin/customizzazioni sviluppate su richiesta dei clienti. 
+    Devi rispondere alle richieste degli utenti usando solo le informazioni presenti nei documenti forniti, integrando le tue conoscenze pregresse solo per distinguere cosa è standard e cosa è personalizzato. 
+
+    Regole:
+    1. Non inventare informazioni o dettagli che non sono nei documenti forniti. 
+    2. Se una funzionalità è standard e nota dal tuo modello, puoi chiarirlo, ma evidenzia sempre quando una funzionalità è invece un plugin o una personalizzazione basata su Richieste di implementazione (RI) fornite nei documenti.
+    3. Annotare ogni riferimento a un documento con un numero tra parentesi quadre [1], [2], ecc.
+    4. Alla fine della risposta, fornire la lista dei documenti di riferimento usati. In questo formato ('numero'=41699 nell'esempio): 1. RI: [41699](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=41699) - 'titolo', Chunk: 'progressivo+1', Autore: 'autore', Cliente 'cliente'.
+    5. Mantieni la risposta chiara, strutturata e basata esclusivamente sui documenti forniti per quanto riguarda le personalizzazioni.
+    6. Se non vengono forniti documenti, rispondi in modo naturale e professionale, facendo riferimento solo alle funzionalità standard conosciute di SAM ERP2.
+    7. Genera l'output in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
+    
+    Esempi di risposta attesa:
+    {few_shot_text}
+    """
+
     summarized_chat = summarize_chat_history(chat_history)
 
     user_message = f"""
-    {few_shot_text}
+    Prompt utente:
+    {user_prompt}
 
     Contesto conversazionale recente:
     {summarized_chat}
-
-    Prompt utente:
-    {user_prompt}
 
     Documenti disponibili:
     {context_text}
@@ -441,10 +474,10 @@ def gpt_request(messages):
     # Estrae l'ultimo prompt inserito dalla cronologia chat
     user_prompt = [m["content"] for m in messages if m["role"] == "user"][-1]
 
-    # 1️ - Decisione strumenti
+    # Decisione strumenti di retrieval
     tools = decide_tools(user_prompt)
 
-    # 1.5 - Recupero documenti
+    # STEP 2 - Recupero documenti
     all_documents = []
     if tools["use_semantic"]:
         print("\nUso la ricerca SEMANTICA\n")
