@@ -92,7 +92,6 @@ class EvaluationQuery:
     query_text:         str
     relevant_chunk_ids: List[str]
     relevant_doc_ids:   List[str]           = field(default_factory=list)
-    relevant_spans:     List[str]           = field(default_factory=list)
     reference_answer:   Optional[str]       = None
     # Campi specifici query negative (None = query positiva)
     expected_behavior:  Optional[str]       = None
@@ -101,11 +100,6 @@ class EvaluationQuery:
     @property
     def is_negative(self) -> bool:
         return self.expected_behavior is not None
-
-    @property
-    def has_spans(self) -> bool:
-        """True se il dataset è stato migrato al formato span-based."""
-        return len(self.relevant_spans) > 0
 
 @dataclass
 class RetrievalResult:
@@ -172,7 +166,6 @@ def load_gold_dataset(filepath: str) -> List[EvaluationQuery]:
             query_text         = item['query_text'],
             relevant_chunk_ids = item.get('relevant_chunk_ids', []),
             relevant_doc_ids   = item.get('relevant_doc_ids', []),
-            relevant_spans     = item.get('relevant_spans', []),
             reference_answer   = item.get('reference_answer'),
             expected_behavior  = item.get('expected_behavior'),
             negative_reason    = item.get('negative_reason')
@@ -225,81 +218,6 @@ def calculate_recall_at_k_normalized(
         return 0.0
     top_k = retrieved_ids[:k]
     return sum(1 for doc_id in top_k if doc_id in relevant_ids) / min(k, len(relevant_ids))
-
-# ── Metriche span-centriche ───────────────────────────────────────────────────
-
-def chunk_covers_span(
-    chunk_text: str,
-    span:       str,
-    threshold:  float = 0.7
-) -> bool:
-    """
-    Verifica se un chunk recuperato copre uno span di riferimento.
-
-    Prima controlla la sottostringa esatta (caso più comune dopo lo snellimento
-    degli span con LLM). Se fallisce usa SequenceMatcher con soglia configurabile
-    per gestire piccole differenze di whitespace o troncature di overlap.
-
-    threshold=0.7 è conservativo: richiede che il 70% del testo dello span
-    più corto sia comune con il chunk. Abbassarlo aumenta i falsi positivi,
-    alzarlo aumenta i falsi negativi su span lunghi con overlap parziale.
-    """
-    span_clean  = span.strip()
-    chunk_clean = chunk_text.strip()
-
-    if not span_clean:
-        return False
-
-    # Controllo sottostringa esatta (O(n) — veloce)
-    if span_clean in chunk_clean:
-        return True
-
-    # Fallback SequenceMatcher su testi normalizzati
-    ratio = SequenceMatcher(None, chunk_clean, span_clean).ratio()
-    return ratio >= threshold
-
-def calculate_span_precision_at_k(
-    retrieved_texts: List[str],
-    relevant_spans:  List[str],
-    k:               int,
-    threshold:       float = 0.7
-) -> float:
-    """
-    P@k span-based = chunk tra i top-k che coprono ≥1 span / k
-
-    Un chunk è "rilevante" se contiene almeno uno degli span di riferimento.
-    """
-    if k == 0 or not retrieved_texts or not relevant_spans:
-        return 0.0
-    top_k = retrieved_texts[:k]
-    relevant_count = sum(
-        1 for chunk in top_k
-        if any(chunk_covers_span(chunk, span, threshold) for span in relevant_spans)
-    )
-    return relevant_count / k
-
-def calculate_span_recall_at_k(
-    retrieved_texts: List[str],
-    relevant_spans:  List[str],
-    k:               int,
-    threshold:       float = 0.7
-) -> float:
-    """
-    R@k span-centrica = span coperti da ≥1 chunk tra i top-k / totale span
-
-    Risponde alla domanda: "quante delle informazioni necessarie per rispondere
-    sono state recuperate?". È invariante al chunking: se due span finiscono
-    nello stesso chunk, vengono entrambi coperti recuperando un solo documento.
-    """
-    if not relevant_spans:
-        return 0.0
-    top_k = retrieved_texts[:k]
-    covered = sum(
-        1 for span in relevant_spans
-        if any(chunk_covers_span(chunk, span, threshold) for chunk in top_k)
-    )
-    return covered / len(relevant_spans)
-
 
 def evaluate_chunk_relevance_with_llm(
     query:      str,
@@ -365,40 +283,26 @@ def calculate_average_chunk_relevance(
     return float(np.mean(scores))
 
 def evaluate_retrieval_for_query(
-    query:              EvaluationQuery,
-    retrieval_result:   RetrievalResult,
-    client:             AzureOpenAI,
-    k_values:           List[int] = [1, 3, 5, 10],
-    llm_model:          str   = JUDGE_MODEL,
-    compute_doc_recall: bool  = False,
-    span_threshold:     float = 0.7
+    query:             EvaluationQuery,
+    retrieval_result:  RetrievalResult,
+    client:            AzureOpenAI,
+    k_values:          List[int] = [1, 3, 5, 10],
+    llm_model:         str = JUDGE_MODEL,
+    compute_doc_recall: bool = False
 ) -> Dict[str, float]:
     """
     Calcola le metriche di retrieval per una singola query positiva.
 
-    Metriche calcolate per ogni k:
-      Chunk-level (usa relevant_chunk_ids — dipende dal chunking):
-        precision_at_k       P@k chunk-based
-        recall_at_k          R@k standard
-        recall_at_k_norm     R@k normalizzata con min(k, |R|) al denominatore
-
-      Span-level (usa relevant_spans — invariante al chunking):
-        span_precision_at_k  P@k span-based: chunk top-k che coprono ≥1 span / k
-        span_recall_at_k     R@k span-centrica: span coperti da top-k / totale span
-        Disponibili solo dopo migrazione con migrate_to_spans.py.
-        Sono le metriche preferite per il confronto tra configurazioni di chunking.
-
-      Document-level (usa relevant_doc_ids — solo per confronto chunking):
-        doc_recall_at_k      Abilitato solo se compute_doc_recall=True.
-        Utile come fallback se gli span non sono disponibili.
-
-      LLM-as-judge:
-        avg_chunk_relevance_topk  Rilevanza media chunk top-k (rubrica 0/1/2)
+    compute_doc_recall: se True calcola anche doc_recall_at_k (document-level,
+    indipendente dal chunking). Va abilitato SOLO nell'esperimento di confronto
+    tra configurazioni di chunking diverse, dove i chunk ID cambiano ma il
+    documento di riferimento rimane stabile. Nelle altre comparazioni è ridondante
+    rispetto alla chunk-level recall e viene omesso per chiarezza.
     """
     metrics = {}
 
-    chunk_ids     = retrieval_result.retrieved_chunk_ids
-    chunk_texts   = retrieval_result.retrieved_chunk_texts
+    chunk_ids = retrieval_result.retrieved_chunk_ids
+    # Per doc-level: estrae il NumRI dai chunk recuperati
     retrieved_doc_ids = list(dict.fromkeys(cid.split("_")[0] for cid in chunk_ids))
 
     for k in k_values:
@@ -412,16 +316,6 @@ def evaluate_retrieval_for_query(
         metrics[f"recall_at_{k}_norm"] = calculate_recall_at_k_normalized(
             chunk_ids, query.relevant_chunk_ids, k
         )
-
-        # --- Span-level (se disponibili) ---
-        if query.has_spans:
-            metrics[f"span_precision_at_{k}"] = calculate_span_precision_at_k(
-                chunk_texts, query.relevant_spans, k, span_threshold
-            )
-            metrics[f"span_recall_at_{k}"] = calculate_span_recall_at_k(
-                chunk_texts, query.relevant_spans, k, span_threshold
-            )
-
         # --- Document-level (solo per confronto chunking) ---
         if compute_doc_recall and query.relevant_doc_ids:
             metrics[f"doc_recall_at_{k}"] = calculate_recall_at_k(
@@ -430,7 +324,9 @@ def evaluate_retrieval_for_query(
 
         # --- LLM-as-judge chunk relevance ---
         metrics[f"avg_chunk_relevance_top{k}"] = calculate_average_chunk_relevance(
-            query.query_text, chunk_texts, client, llm_model, top_k=k
+            query.query_text,
+            retrieval_result.retrieved_chunk_texts,
+            client, llm_model, top_k=k
         )
 
     metrics["retrieval_time"] = retrieval_result.retrieval_time
@@ -1418,8 +1314,7 @@ def compare_test_results(test_results: List[TestResult]):
     print("="*130)
 
     col = 38
-    col = 38
-    print(f"\n{'Configurazione':<{col}} {'P@5':>7} {'R@5':>7} {'R@5n':>7} {'SpR@5':>7} {'LLM-Rel':>8} {'Faith':>7} {'Relev':>7} {'SemSim':>7} {'Robust':>8}")
+    print(f"\n{'Configurazione':<{col}} {'P@5':>7} {'R@5':>7} {'R@5n':>7} {'LLM-Rel':>8} {'Faith':>7} {'Relev':>7} {'SemSim':>7} {'Robust':>8}")
     print("-"*130)
 
     for result in test_results:
@@ -1427,27 +1322,26 @@ def compare_test_results(test_results: List[TestResult]):
         p5      = result.retrieval_metrics.get('avg_precision_at_5', 0.0)
         r5      = result.retrieval_metrics.get('avg_recall_at_5', 0.0)
         r5n     = result.retrieval_metrics.get('avg_recall_at_5_norm', 0.0)
-        spr5    = result.retrieval_metrics.get('avg_span_recall_at_5', 0.0)
         llmrel  = result.retrieval_metrics.get('avg_avg_chunk_relevance_top5', 0.0)
         faith   = result.generation_metrics.get('avg_faithfulness', 0.0)
         relev   = result.generation_metrics.get('avg_answer_relevancy', 0.0)
         semsim  = result.generation_metrics.get('avg_semantic_similarity') or 0.0
         robust  = result.negative_eval_metrics.get('robustness_overall', 0.0)
 
-        print(f"{name:<{col}} {p5:>7.4f} {r5:>7.4f} {r5n:>7.4f} {spr5:>7.4f} {llmrel:>8.4f} {faith:>7.4f} {relev:>7.4f} {semsim:>7.4f} {robust:>8.4f}")
+        print(f"{name:<{col}} {p5:>7.4f} {r5:>7.4f} {r5n:>7.4f} {llmrel:>8.4f} {faith:>7.4f} {relev:>7.4f} {semsim:>7.4f} {robust:>8.4f}")
 
     print("="*130)
     print("\nLegenda:")
     print("  P@5     = Precision@5 (chunk-level)")
     print("  R@5     = Recall@5 standard (chunk-level)")
     print("  R@5n    = Recall@5 normalizzata — denominatore min(5, |R|)")
-    print("  SpR@5   = Span Recall@5 — span coperti tra top-5 / totale span  (0.0 se no spans)")
     print("  LLM-Rel = LLM-as-judge chunk relevance (rubrica 0/1/2, media top-5)")
-    print("  Faith   = Faithfulness con claim atomici (LLM-as-judge)")
+    print("  Faith   = Faithfulness (LLM-as-judge, rubrica 0/1/2)")
     print("  Relev   = Answer Relevancy (LLM-as-judge, rubrica 0/1/2)")
     print("  SemSim  = Semantic Similarity (cosine su embeddings)")
     print("  Robust  = Robustezza su query negative (0=fallisce, 1=gestisce correttamente)")
     print()
+
 
 # ==================== TEST PRINCIPALE ====================
 

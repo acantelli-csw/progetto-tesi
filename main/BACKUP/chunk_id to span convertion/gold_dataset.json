@@ -1,0 +1,552 @@
+[
+  {
+    "query_id": "Q000",
+    "query_text": "Mi serve sapere se info@gmrenlights.com e' l'e-mail giusta per contattare GMR ENLIGHTS S.R.L., puoi confermare? Chi e' la persona di riferimento per il cliente? E quali sono i principali plug-in implementati per GMR ENLIGHTS S.R.L.?",
+    "relevant_chunk_ids": [
+      "55002_0",
+      "55459_0",
+      "54803_0",
+      "54507_0",
+      "56071_0",
+      "56076_0"
+    ],
+    "reference_answer": "Sì, info@gmrenlights.com e' indicata come l'e-mail di GMR ENLIGHTS S.R.L. e il riferimento del cliente e' Daniele Valentini. Questi sono i principali plugin implementati per GMR ENLIGHTS S.R.L.: Portale CRM1 - Regole di visibilita' di contatti e opportunita', Compilazione automatica del campo Riferi1 di prima nota su registrazioni di ripartizioni mensili derivanti da contabilita' analitica, Import paghe con nuovo tracciato, LINK AZIONIE VS BPM, Nuove richieste POW CRM1 Custom Configuratore, Provvigioni Francia - modifica algoritmo calcolo provvigione.",
+    "relevant_doc_ids": [
+      "55002",
+      "55459",
+      "54803",
+      "54507",
+      "56071",
+      "56076"
+    ]
+  },
+  {
+    "query_id": "Q001",
+    "query_text": "In che modo l'automazione dei processi contabili e la gestione automatizzata delle scritture vengono implementate tramite il ribaltamento in contabilita' analitica e il lancio delle ripartizioni mensili extracontabili?",
+    "relevant_chunk_ids": [
+      "55459_1",
+      "55459_2",
+      "55459_3"
+    ],
+    "reference_answer": "L'automazione dei processi contabili e la gestione automatizzata delle scritture sono implementate attraverso il ribaltamento in contabilita' analitica, dove al salvataggio della registrazione il sistema apre la maschera della contabilita' analitica e permette all'utente di ribaltare la scrittura su piu' centri di costo compilando il campo Riferi1. Inoltre, tramite il lancio delle ripartizioni mensili extracontabili, il sistema genera automaticamente registrazioni di prima nota extracontabile in base al periodo di competenza, storna il conto di partenza, apre il conto Ripartizione e suddivide il costo totale proporzionalmente ai giorni di competenza, riflettendo queste operazioni anche sulla prima nota analitica.",
+    "relevant_doc_ids": [
+      "55459"
+    ]
+  },
+  {
+    "query_id": "Q002",
+    "query_text": "Come si gestisce la relazione tra Area Manager e agenti per la visibilita' dei contatti e delle opportunita' nel portale CRM, considerando le regole specifiche per il profilo Area Manager?",
+    "relevant_chunk_ids": [
+      "55002_1",
+      "55002_2",
+      "55002_3"
+    ],
+    "reference_answer": "La relazione tra Area Manager e agenti viene gestita tramite una tabella che riporta le associazioni tra Agente (utente web), Direttore Commerciale (utente web) e Zona (tabella Regione), includendo anche l'informazione Area Manager. Per il profilo Area Manager, le regole di visibilita' prevedono che l'Area Manager possa visualizzare tutti i contatti degli agenti a lui associati e tutti i contatti delle zone a lui associate. Inoltre, l'Area Manager puo' vedere le opportunita' degli agenti a lui associati (quando gli agenti sono indicati come proprietario, Agente 1 o Agente 2) e le opportunita' delle zone a lui associate. Queste relazioni e regole sono gestite a livello di database e non richiedono un'interfaccia dedicata in questa fase.",
+    "relevant_doc_ids": [
+      "55002"
+    ]
+  },
+  {
+    "query_id": "Q003",
+    "query_text": "Come si fa ad usare il file di configurazione per schedulare job di importazione e anche per attivare personalizzazioni esterne quando si importa file di testo usando tracciato XML? spiegami come funziona tutto insieme, tipo dove si mette nome del plug-in e come si fa a far partire operazioni specifiche, e come il file di configurazione serve sia per la sequenza dei job che per le personalizzazioni.",
+    "relevant_chunk_ids": [
+      "55749_3",
+      "55749_9",
+      "55749_4",
+      "55749_1",
+      "55749_8"
+    ],
+    "reference_answer": "Per usare file di configurazione per schedulare job di importazione, l'applicazione esegue in sequenza i Job richiesti secondo le modalita' indicate nel file di configurazione; quindi, il file di configurazione dice come e quando partono i job. Poi, se si vuole attivare personalizzazioni esterne quando si importa il file di testo usando tracciato XML, bisogna mettere nel file di configurazione del tracciato XML il nome del plug-in e il nome delle funzioni da eseguire. Così, quando si importa, si possono fare operazioni specifiche come modificare dati del file di testo, cambiare valori nella tabella temporanea, o fare cose dopo il salvataggio del file XML. Quindi il file di configurazione serve sia per dire la sequenza dei job schedulati che per attivare personalizzazioni esterne, basta mettere le informazioni giuste dentro.",
+    "relevant_doc_ids": [
+      "55749"
+    ]
+  },
+  {
+    "query_id": "Q004",
+    "query_text": "“Come si fa la configurazione autonoma dei tracciati di importazione e come funziona il processo di import dei documenti con le specifiche configurabili? cioe, se voglio importare un file di testo con specifiche diverse, come posso gestire la decodifica e la preparazione del file XML, e la schedulazione del processo, usando i tracciati configurabili?",
+    "relevant_chunk_ids": [
+      "55749_7",
+      "55749_1",
+      "55749_3",
+      "55749_2",
+      "55749_9",
+      "55749_4",
+      "55749_8"
+    ],
+    "reference_answer": "La configurazione autonoma dei tracciati di importazione viene gestita tramite la definizione di tracciati in formato XML, che permettono di specificare le logiche di importazione delle informazioni secondo le esigenze del contesto. In alternativa, si puo' usare il tool XML Generator per personalizzare ulteriormente la logica di elaborazione del file di testo. Il processo di import dei documenti con specifiche configurabili si articola in tre fasi: prima, il sistema decodifica il file di testo interpretando le informazioni in base al tracciato selezionato e memorizzando i valori in una tabella temporanea secondo le specifiche impostate; poi, legge la tabella temporanea e genera il file per la procedura 'XML Import'; infine, esegue la procedura di importazione XML. La procedura puo' essere schedulata tramite un comando di sistema che richiama un programma eseguibile, il quale eredita le stesse logiche della procedura manuale e consente di eseguire in sequenza i Job richiesti secondo le modalita' indicate nel file di configurazione. In questo modo, e' possibile gestire l'importazione di file di testo con specifiche diverse configurando autonomamente i tracciati e programmando l'esecuzione dei Job.",
+    "relevant_doc_ids": [
+      "55749"
+    ]
+  },
+  {
+    "query_id": "Q005",
+    "query_text": "Come si puo' abilitare la personalizzazione esterna tramite plug-in sia nei processi di esportazione che di importazione EDI, e quali sono i requisiti di configurazione per ciascun caso?",
+    "relevant_chunk_ids": [
+      "45687_4",
+      "45687_7",
+      "53411_4",
+      "52795_4",
+      "53513_4",
+      "55749_4"
+    ],
+    "reference_answer": "La personalizzazione esterna tramite plug-in puo' essere abilitata sia nei processi di esportazione che di importazione EDI. Per l'esportazione, e' necessario indicare nel file di configurazione dei Job di esportazione il nome del plug-in e della funzione da eseguire sull'evento di attivazione desiderato. Questo consente di personalizzare un Job, un tracciato o una interfaccia di esportazione, permettendo di riutilizzare lo stesso tracciato generico e compiere operazioni specifiche in base al Job selezionato. Per l'importazione, se si utilizza il tracciato XML per la decodifica dei file di testo, bisogna specificare nel file di configurazione del tracciato XML il nome del plug-in e della funzione da eseguire sull'evento di attivazione necessario. In questo modo, e' possibile personalizzare un Job di importazione in base ai dati letti dal file, riutilizzando lo stesso tracciato di importazione generico e compiendo operazioni specifiche a seconda dei dati d'origine. In entrambi i casi, eventuali richieste per nuove funzionalita' personalizzate esterne al tool devono essere valutate separatamente.",
+    "relevant_doc_ids": [
+      "45687",
+      "53411",
+      "52795",
+      "53513",
+      "55749"
+    ]
+  },
+  {
+    "query_id": "Q006",
+    "query_text": "Mi spieghi come funziona l'importazione file excel per le paghe? Se io ho un file excel con colonne diverse, tipo una colonna per il conto contabile e poi importi separati dare e avere, il plugin riesce a generare la scrittura contabile automatica? E se invece il file ha solo una colonna importo e una segno D/A, cambia qualcosa nell'importazione payroll?",
+    "relevant_chunk_ids": [
+      "51901_0",
+      "51901_1",
+      "54803_0",
+      "54803_1",
+      "54803_2",
+      "38117_1",
+      "50858_1"
+    ],
+    "reference_answer": "L'importazione del file Excel per le paghe permette di generare automaticamente la scrittura contabile degli stipendi e l'imputazione ai centri di costo collegati. Secondo le specifiche, il plugin puo' importare due file Excel prodotti dal consulente esterno per creare scritture contabili ed extra-contabili. Se il file Excel ha una colonna per il conto contabile e importi separati su due colonne (una per il dare e una per l'avere), il sistema gestisce questa situazione come descritto nella richiesta RI 54215. Se invece il file ha una sola colonna per l'importo e una colonna per il segno D/A, anche questa configurazione viene gestita dal plugin, che riconosce il segno per determinare se l'importo va in dare o avere. In entrambi i casi, l'importazione payroll viene adattata alla struttura del file Excel fornito, garantendo la generazione automatica delle scritture contabili.",
+    "relevant_doc_ids": [
+      "51901",
+      "54803",
+      "38117",
+      "50858"
+    ]
+  },
+  {
+    "query_id": "Q007",
+    "query_text": "“Come avviene il recupero dei conti tramite FullCodSearch quando ci sono anomalie nella ripartizione analitica per centro di costo e come viene gestita la ricerca dei conti se i codici non corrispondono tra il file e SAM? Spiega anche cosa succede se manca il conto in una riga del file e se il tracciato CSV viene modificato.”",
+    "relevant_chunk_ids": [
+      "38117_2",
+      "38117_4",
+      "50858_9",
+      "51901_3"
+    ],
+    "reference_answer": "Il recupero dei conti avviene inizialmente tramite il campo FullCodSearch; se la ricerca non produce risultati, si procede utilizzando un campo esterno della tabella conti scelto dal cliente e mappato nel file di configurazione (ad esempio annotazioni o riferi1), permettendo così una trascodifica se i codici dei conti del file non corrispondono a quelli di SAM. Se non si riscontrano anomalie, si procede alla registrazione in prima nota raggruppando gli importi per conto e successivamente alla ripartizione analitica in base ai centri di costo (CDC). Tuttavia, se durante la generazione della registrazione e la ripartizione analitica per centro di costo si verificano anomalie, la procedura viene interrotta, tutte le modifiche apportate vengono annullate e un messaggio indica all'utente l'origine del problema. Inoltre, tutte le righe del file in cui non e' indicato un conto vengono escluse dalla registrazione, poiche' rappresentano importi parziali raggruppati per tipologia. Infine, una modifica al tracciato del file CSV richiede necessariamente una modifica al plug-in per adeguarlo alle variazioni.",
+    "relevant_doc_ids": [
+      "38117",
+      "50858",
+      "51901"
+    ]
+  },
+  {
+    "query_id": "Q008",
+    "query_text": "“Come si fa per importare le voci contabili dello studio paghe da excel se manca il codice strutturato e come si collega il piano dei conti dello studio paghe con quello di SAM?”",
+    "relevant_chunk_ids": [
+      "50858_4",
+      "50858_5",
+      "47198_0",
+      "47198_1"
+    ],
+    "reference_answer": "Per importare le voci contabili dello studio paghe da Excel, anche se manca il codice strutturato, il sistema di importazione deve basarsi sulla descrizione della voce contabile trovata nella colonna K del file Excel. È necessario tabellare queste descrizioni su ERP2, associandole a un codice interno di SAM. La tabella deve essere gestibile in SAM, dove, tramite il tasto 'Nuovo', si puo' inserire il codice conto dello studio paghe e selezionare dal menu a tendina il conto corrispondente del piano dei conti di SAM. In questo modo si crea la corretta associazione tra il piano dei conti dello studio paghe e quello di SAM, garantendo l'unicita' tramite una chiave referenziale.",
+    "relevant_doc_ids": [
+      "50858",
+      "47198"
+    ]
+  },
+  {
+    "query_id": "Q009",
+    "query_text": "Come la personalizzazione dell'elaborazione fabbisogni aiuta a dare flessibilita' nell'analisi dei fabbisogni per ogni plant dopo la fusione delle tre societa' in EMMI DESSERT ITALIA?",
+    "relevant_chunk_ids": [
+      "38312_0",
+      "38312_1",
+      "38312_2",
+      "38312_3",
+      "38312_4"
+    ],
+    "reference_answer": "La personalizzazione dell'elaborazione fabbisogni permette di creare varianti della distinta base specifiche per ogni commessa, con quantita' di impiego componenti ricalcolate secondo logiche personalizzate. Questo aiuta perche', dopo la fusione delle tre societa' in EMMI DESSERT ITALIA, serve flessibilita' per analizzare i fabbisogni sia per singolo plant che in modo globalizzato. Con la modalita' lancio globale, si puo' fare un unico lancio MRP che considera i criteri di ogni plant, e il sistema genera documenti e ordini collegati ai plant giusti, usando il tipo documento appropriato e associando fornitori preferenziali per articolo e plant.",
+    "relevant_doc_ids": [
+      "38312"
+    ]
+  },
+  {
+    "query_id": "Q010",
+    "query_text": "Quando importo il piano, come si gestisce le righe di ordine e la data di importazione del piano, e che succede se ci sono errori o quantita' in eccedenza?",
+    "relevant_chunk_ids": [
+      "37619_13",
+      "37619_2",
+      "37619_11",
+      "37619_19"
+    ],
+    "reference_answer": "Quando si importa il piano, tutte le righe inevase dell'ordine vengono cancellate e reinserite, tenendo conto delle casistiche specificate. Se ci sono errori nella cancellazione, le righe saranno evase forzatamente e segnalate. Le righe parzialmente evase saranno evase per la quantita' aperta e per questa sara' inserita una nuova riga con consegna richiesta uguale alla data di importazione, che e' sempre uguale alla data del piano. Se il tracciato lo prevede, le quantita' in eccedenza o in ritardo saranno gestite detraendo o aggiungendo alle righe da importare fino a esaurimento.",
+    "relevant_doc_ids": [
+      "37619"
+    ]
+  },
+  {
+    "query_id": "Q011",
+    "query_text": "Cosa fa la Tabsheet Documenti e come viene determinata la Data Disponibilita' al suo interno?",
+    "relevant_chunk_ids": [
+      "39575_1",
+      "39575_3"
+    ],
+    "reference_answer": "La Tabsheet Documenti aggiunge alla prima griglia (quella con il riepilogo documenti) due nuove colonne: la colonna \"Tipo Disponibilita'\", compilata con la disponibilita' piu' vincolante delle righe del documento, e la colonna \"Data Disponibilita'\", compilata con la data di disponibilita' piu' vincolante delle righe del documento, ovvero quella piu' lontana. Viene anche aggiunta la colorazione, uguale alla colorazione della riga piu' vincolante tra le righe del documento.",
+    "relevant_doc_ids": [
+      "39575"
+    ]
+  },
+  {
+    "query_id": "Q012",
+    "query_text": "Ciao, mi puoi dire come la revisione del plugin per l'importazione dei piani di consegna, menzionata nella relazione del 25/03/2025 per ELETTROSTAMPERIE POPPI S.P.A., si collega alle logiche di calcolo provvigionale gia' consolidate e descritte nella richiesta del 12/03/2025 per GMR ENLIGHTS S.R.L.? Vorrei capire se ci sono sovrapposizioni o se le modifiche del plugin impattano anche le logiche di calcolo provvigionale gia' implementate.",
+    "relevant_chunk_ids": [
+      "54614_0",
+      "54614_4",
+      "54507_0"
+    ],
+    "reference_answer": "La revisione del plugin per l'importazione dei piani di consegna, descritta nella relazione del 25/03/2025 per ELETTROSTAMPERIE POPPI S.P.A., riguarda l'aggiornamento delle utilita' comuni a tutte le importazioni. Nella richiesta del 12/03/2025 per GMR ENLIGHTS S.R.L. viene specificato che le logiche di calcolo provvigionale sono gia' implementate e consolidate nell'attuale plugin, e non vengono ulteriormente dettagliate. Non viene indicata una sovrapposizione diretta tra le modifiche del plugin per l'importazione dei piani di consegna e le logiche di calcolo provvigionale; quindi, dalle informazioni fornite non risulta che la revisione del plugin impatti le logiche di calcolo provvigionale gia' implementate.",
+    "relevant_doc_ids": [
+      "54614",
+      "54507"
+    ]
+  },
+  {
+    "query_id": "Q013",
+    "query_text": "Qual e' la funzione del parametro CARTELLA_INPUT nella configurazione EDI?",
+    "relevant_chunk_ids": [
+      "53512_5",
+      "45687_11",
+      "55749_5",
+      "53513_5",
+      "52795_5",
+      "53411_4"
+    ],
+    "reference_answer": "Il parametro CARTELLA_INPUT indica la cartella da cui il sistema importera' tutti i file che rispettano le condizioni specificate nel parametro FILTRO_FILE.",
+    "relevant_doc_ids": [
+      "53512",
+      "45687",
+      "55749",
+      "53513",
+      "52795",
+      "53411"
+    ]
+  },
+  {
+    "query_id": "Q014",
+    "query_text": "Come si usa il classificatore generico 1 per separare ddt fresco/secco coi Classificatori Generici?",
+    "relevant_chunk_ids": [
+      "55614_0",
+      "55614_1"
+    ],
+    "reference_answer": "Il classificatore generico 1 serve per identificare la tipologia articolo (Fresco o Secco) e con i Classificatori Generici si puo' separare i ddt di vendita in due tipi: Ddt di vendita Fresco spa con prefisso F e Ddt di vendita Secco spa con prefisso S.",
+    "relevant_doc_ids": [
+      "55614"
+    ]
+  },
+  {
+    "query_id": "Q015",
+    "query_text": "Nei flussi finanziari di SAM vengono tracciati anche le previsioni su interessi passivi/attivi bancari?",
+    "relevant_chunk_ids": [
+      "54363_0",
+      "54363_3",
+      "54363_5",
+      "53139_0",
+      "53139_1"
+    ],
+    "reference_answer": "Sì, nei flussi finanziari vengono tracciati gli interessi passivi bancari attraverso due implementazioni. La RI_53139 calcola gli interessi per anticipo fattura e Ricevuta Bancaria usando la formula: (giorni tra emissione e scadenza × interesse debitore × importo fattura) / 36500, con data di addebito coincidente alla scadenza. La RI_54363 espone la previsione di liquidazione degli interessi sfruttando la funzione \"calcolo interessi e competenze c/c\" con periodicita' configurabile per ogni conto banca. In entrambi i casi, i tabsheet Globale e Totale liquidita' vengono ricalcolati includendo queste rilevazioni.",
+    "relevant_doc_ids": [
+      "54363",
+      "53139"
+    ]
+  },
+  {
+    "query_id": "Q016",
+    "query_text": "Come funziona la configurazione della periodicita' di liquidazione degli interessi nella previsione finanziaria e quali sono le diverse opzioni disponibili per personalizzare il calcolo in base alle regole specifiche di ciascuna banca?",
+    "relevant_chunk_ids": [
+      "03_28",
+      "54363_0",
+      "54363_1",
+      "54363_2"
+    ],
+    "reference_answer": null,
+    "relevant_doc_ids": [
+      "03",
+      "54363"
+    ]
+  },
+  {
+    "query_id": "Q017",
+    "query_text": "Come viene gestita la sovrascrittura delle scritture extracontabili nel calcolo degli interessi durante un periodo attivo e cosa succede quando si passa al periodo successivo nella previsione finanziaria?",
+    "relevant_chunk_ids": [
+      "04_30",
+      "54363_3",
+      "54363_4"
+    ],
+    "reference_answer": null,
+    "relevant_doc_ids": [
+      "04",
+      "54363"
+    ]
+  },
+  {
+    "query_id": "Q018",
+    "query_text": "Quali sono i parametri configurabili e le caratteristiche della scrittura extracontabile che viene creata per il calcolo degli interessi passivi nella previsione finanziaria?",
+    "relevant_chunk_ids": [
+      "54363_4",
+      "54363_5"
+    ],
+    "reference_answer": "La scrittura extracontabile prevede: data di addebito coincidente con quella calcolata dalla periodicita' di liquidazione; causale \"fittizia\" da file di configurazione; conto della scrittura sempre di tipo \"conto corrente\" (anticipi, salvo buon fine o c/c); contropartita configurabile in file .ini (tipicamente \"interessi passivi\"). I tabsheet Globale e Totale liquidita' vengono ricalcolati includendo queste rilevazioni. Il plugin esistente viene adeguato per calcolare interessi futuri da data \"odierna\" + 1, con possibilita' di disattivarlo via configurazione.",
+    "relevant_doc_ids": [
+      "54363"
+    ]
+  },
+  {
+    "query_id": "Q019",
+    "query_text": "Come viene determinato il conto dare e il conto avere durante l'importazione del file Airplus e come cambia la logica in caso di importo negativo?",
+    "relevant_chunk_ids": [
+      "55309_1",
+      "55309_3"
+    ],
+    "reference_answer": "Durante l'importazione del file Airplus, il conto dare viene recuperato dalla tabella di transcodifica delle tipologie di costo in base ai valori presenti nel file. Il conto avere viene invece recuperato dal file di configurazione (file ini) ed e' uguale per tutte le righe.\nNel caso in cui il valore della colonna Gross Amount sia negativo, la logica viene invertita: il conto normalmente previsto come dare diventa avere e viceversa, consentendo la corretta gestione degli storni contabili.",
+    "relevant_doc_ids": [
+      "55309"
+    ]
+  },
+  {
+    "query_id": "Q020",
+    "query_text": "Come vengono popolati i campi RIFERI1, RIFERI2 e RIFERI3 durante l'importazione delle righe del file CSV Airplus?",
+    "relevant_chunk_ids": [
+      "55309_2"
+    ],
+    "reference_answer": "Il campo RIFERI1 viene popolato utilizzando la tabella di transcodifica dei tipi di servizio, applicando un confronto SQL di tipo LIKE sui primi caratteri del valore presente nella colonna Service Type del file Airplus.\nIl campo RIFERI2 contiene il nome del passeggero, recuperato dalla colonna Traveller del file CSV.\nIl campo RIFERI3 viene valorizzato con l'identificativo IDCOMRIG, utilizzato anche per la gestione della contabilita' analitica.",
+    "relevant_doc_ids": [
+      "55309"
+    ]
+  },
+  {
+    "query_id": "Q021",
+    "query_text": "In che modo viene gestita la contabilita' divisionale durante l'importazione AIRPLUS e quale ruolo ha la funzione SQL dedicata?",
+    "relevant_chunk_ids": [
+      "55309_4",
+      "55325_2"
+    ],
+    "reference_answer": "La contabilita' divisionale viene gestita solo se attivata tramite parametro di configurazione. In questo caso, se e' indicata una commessa, il sistema risale alla divisione associata al tipo documento e calcola automaticamente il centro di costo concatenando il codice divisione con il suffisso “-QA3”.\nQuesta logica e' incapsulata nella funzione SQL F_PI_IMP_ZTRAVEL, che restituisce sia il centro di costo sia la divisione, garantendo flessibilita' e riducendo la necessita' di modifiche applicative. La stessa impostazione tecnica e' condivisa tra i documenti RI_55309 e RI_55325",
+    "relevant_doc_ids": [
+      "55309",
+      "55325"
+    ]
+  },
+  {
+    "query_id": "Q022",
+    "query_text": "Esiste un modo di precompilare le righe di intervento in base al numero di dipendenti e di giorni, seguendo uno schema base configurabile? Ad esempio, se configurassimo 5 campi fissi nello schema base, quante righe di intervento precompilato si dovrebbero generare per 3 dipendenti con 3 giorni di interventi?",
+    "relevant_chunk_ids": [
+      "53110_0",
+      "53110_1",
+      "53110_2",
+      "53110_3",
+      "53110_4"
+    ],
+    "reference_answer": "Sì, esiste un sistema di precompilazione delle righe di intervento basato su schema configurabile. Il sistema genera automaticamente righe di attivita' (ATTINT) moltiplicate per il numero di tecnici e giorni. Lo schema base e' parametrizzabile tramite MenuSpe dove si definiscono articoli e attivita' della giornata tipo. In fase di generazione, SAM chiede all'utente il numero di giorni e tecnici; da POW si usa il bottone \"Prolunga Intervento\" per inserire il set parametrizzato. Nel documento si usa l'esempio di 7 righe per giorno/tecnico: 1 tecnico per 3 giorni genera 7×3=21 righe, 2 tecnici generano 42 righe. Applicando la tua configurazione con 5 campi fissi nello schema base, per 3 dipendenti con 3 giorni si genererebbero 5×3×3=45 righe di intervento precompilato.",
+    "relevant_doc_ids": [
+      "53110"
+    ]
+  },
+  {
+    "query_id": "Q023",
+    "query_text": "Esiste un modo per gestire i trasferimenti interni su magazzini mobili tramite portale CRM2?",
+    "relevant_chunk_ids": [
+      "45674_0",
+      "45674_1",
+      "45674_2",
+      "45674_3"
+    ],
+    "reference_answer": "Sì, i trasferimenti interni tra tecnici su magazzini mobili sono gestiti tramite POW CRM2. I tecnici devono essere codificati come agenti e collegati a magazzini mobili. Il sistema prevede un tipo documento specifico (configurabile da Web.Config) che genera interventi senza attivita' precompilate. Il tecnico compila le righe degli articoli da trasferire, selezionando i colleghi destinatari. In fase di scarico, la causale \"Trasferimento interno\" viene preselezionata automaticamente e non e' modificabile. Il magazzino di partenza e' quello del tecnico mittente, quello di arrivo viene selezionato tramite menu a tendina tra i tecnici disponibili. Il dato del magazzino di scarico viene visualizzato nel listing articoli dopo l'operazione.",
+    "relevant_doc_ids": [
+      "45674"
+    ]
+  },
+  {
+    "query_id": "Q024",
+    "query_text": "Quali sono i punti di attivazione della personalizzazione per la generazione automatica delle righe di intervento in SAM e come differisce il comportamento tra SAM e POW?",
+    "relevant_chunk_ids": [
+      "53110_2",
+      "53110_3",
+      "53110_4"
+    ],
+    "reference_answer": "In SAM i punti di attivazione sono: Scheda Servizio (personalizzazione gia' esistente), Griglia Scheda Intervento e RMA Standard. Ad ogni attivazione, una procedura chiede all'operatore di indicare numero giorni e tecnici: se entrambi diversi da zero, vengono generate le attivita' moltiplicate per giorni e tecnici secondo le parametrizzazioni definite in \"Programmi Speciali\". In POW, invece, nella pagina di riepilogo attivita' viene aggiunto il bottone \"Prolunga Intervento\" che permette di selezionare tecnico (proposto di default quello loggato) e data, inserendo automaticamente le 7 attivita'/articoli parametrizzate per una singola giornata secondo lo script SQL della consulenza.",
+    "relevant_doc_ids": [
+      "53110"
+    ]
+  },
+  {
+    "query_id": "Q025",
+    "query_text": "Quali sono le caratteristiche specifiche degli interventi generati per trasferimenti interni e quali limitazioni hanno rispetto agli interventi standard?",
+    "relevant_chunk_ids": [
+      "45674_1",
+      "45674_2",
+      "45674_3"
+    ],
+    "reference_answer": "Gli interventi per trasferimenti interni hanno caratteristiche specifiche: nascono senza attivita' precompilate e l'aggiunta di attivita' viene completamente disabilitata per questo tipo documento. L'ID del tipo documento e' settabile tramite chiave Web.Config. Il tecnico compila manualmente le righe degli articoli da trasferire ai colleghi (possono essere diverse righe verso diversi colleghi). La causale scarico \"Trasferimento interno\" viene preselezionata automaticamente ed e' non modificabile. Per ogni articolo in fase di scarico e' possibile indicare il \"magazzino di trasferimento\" tramite select che mostra il nome del tecnico destinatario. Ogni tecnico deve avere un magazzino mobile dedicato.",
+    "relevant_doc_ids": [
+      "45674"
+    ]
+  },
+  {
+    "query_id": "Q026",
+    "query_text": "Qual'e' la logica di riperimento dello sconto sulle righe di ordine di vendita implementata per MVM srl? Considera che il classificatore 5 e' lo stesso per entrambi i codici, che i codici non hanno nessuno sconto sul listino e che listino personalizzato del cliente vince sempre sugli sconti e sul comportamento standard",
+    "relevant_chunk_ids": [
+      "46443_0",
+      "46443_1",
+      "46443_2",
+      "46445_0",
+      "46445_1",
+      "46533_0",
+      "46533_1",
+      "46533_2",
+      "46533_3",
+      "50493_0",
+      "50493_1"
+    ],
+    "reference_answer": "La logica di reperimento dello sconto per MVM srl segue un sistema gerarchico di priorita'. Se il cliente ha un listino personalizzato per l'articolo, questo ha priorita' assoluta e non viene calcolato alcuno sconto. Se non esiste listino personalizzato, il prezzo viene preso dal listino R40 (base) e lo SCONTO1 viene calcolato secondo la seguente gerarchia: prima si verifica se il cliente ha una categoria di Sconto per Quantita' e se l'articolo (tramite ARTCLA5/classificatore 5) rientra negli scaglioni configurati, in tal caso lo SCONTO1 proviene dalla gestione \"Sconti per Quantita'\" che raggruppa gli articoli per classificatore 5 e applica lo sconto in base alla somma delle quantita' totali nell'ordine; in alternativa, se il cliente ha una categoria di Sconto standard e l'articolo (tramite ARTCLA2) rientra nello sconto, lo SCONTO1 viene preso dalla gestione Sconti standard. Se l'articolo ha prezzo su listino personalizzato gestito a scaglioni ma non raggiunge lo scaglione minimo, si applica la scontistica secondo l'elenco gerarchico precedente. Inoltre, per articoli con classificatore 5, viene applicato un controllo di sconto massimo: se lo SCONTO1 supera il valore massimo impostato nel Classificatore Generico 5, viene sostituito con lo sconto massimo configurato.",
+    "relevant_doc_ids": [
+      "46443",
+      "46445",
+      "46533",
+      "50493"
+    ]
+  },
+  {
+    "query_id": "Q027",
+    "query_text": "Qual e' la logica dietro al ricalcolo delle spese di trasporto sugli ordini di vendita fatto per Logos SPA?",
+    "relevant_chunk_ids": [
+      "53893_0",
+      "53893_1",
+      "53893_2",
+      "53893_4"
+    ],
+    "reference_answer": "Il ricalcolo delle spese di trasporto per Logos SPA si basa su quattro parametri configurabili per ogni cliente: spese trasporto minime, spese trasporto massime, ammontare soglia e percentuale. La logica applica le spese minime se l'importo ordine (TOTRIG + TOTIVA) e' inferiore all'ammontare soglia. Superata la soglia, calcola la percentuale sull'importo ordine fino al limite delle spese massime. Se le spese massime sono zero, dopo la soglia le spese diventano zero. Il ricalcolo avviene ad ogni salvataggio della testata delle fatture di vendita, solo se almeno uno dei quattro campi e' compilato e se il flag \"Spese trasporto Manuali\" non e' selezionato. Il plug-in compila solo il campo \"Val. spese trasp.\" e non \"% spese trasp.\", e si attiva anche nella fatturazione globale per ricalcolare le spese al termine della generazione delle fatture.",
+    "relevant_doc_ids": [
+      "53893"
+    ]
+  },
+  {
+    "query_id": "Q028",
+    "query_text": "Come vengono gestiti i listini personalizzati con scaglioni di quantita' \"Da-A\" e cosa succede quando la quantita' ordinata non rientra negli scaglioni definiti?",
+    "relevant_chunk_ids": [
+      "46533_0",
+      "46533_1",
+      "46533_2",
+      "46533_3"
+    ],
+    "reference_answer": "I listini personalizzati con scaglioni di quantita' \"Da-A\" prevedono due campi per ogni scaglione: \"q.ta' da\" (limite minimo) e \"q.ta' fino a\" (limite massimo). Al salvataggio delle righe dei documenti di vendita, se l'articolo e' presente una sola volta e il listino e' personalizzato, il sistema verifica se la quantita' inventariale rientra in un intervallo definito: se sì, imposta il prezzo dello scaglione; altrimenti recupera prezzo e scontistica dal listino base. Se l'articolo e' presente piu' volte nel documento, un messaggio chiede all'utente se ricalcolare considerando la somma delle quantita' di tutte le righe, valutare solo la quantita' della riga in salvataggio, o lasciare invariato il prezzo. Le quantita' vengono considerate come somma delle righe con stesso codice articolo, anche se hanno date di consegna diverse. Se la quantita' non rientra negli scaglioni (minore o maggiore), il listino personalizzato non e' valido e si applicano le logiche standard su listino base.",
+    "relevant_doc_ids": [
+      "46533"
+    ]
+  },
+  {
+    "query_id": "Q029",
+    "query_text": "Listini con codice cliente: successivamente vengono applicate le provvigioni presenti su listini il cui codice coincide con quello del cliente della fattura, se validi alla data dell'ordine.",
+    "relevant_chunk_ids": [
+      "51576_2",
+      "51576_3",
+      "51576_4",
+      "51576_5"
+    ],
+    "reference_answer": "Tabella personalizzata con priorita': infine vengono elaborate solo le righe che risultano ancora con provvigione pari a zero, applicando le regole definite in una tabella personalizzata ordinata per priorita', che considera agente, cliente, tipologia, gruppo articolo, articolo e sconti. Le regole vengono eseguite a cascata in base alla priorita' definita, senza ulteriori controlli sulle righe rimaste senza provvigione al termine del processo.",
+    "relevant_doc_ids": [
+      "51576"
+    ]
+  },
+  {
+    "query_id": "Q030",
+    "query_text": "Quali righe di fattura vengono considerate nel calcolo delle provvigioni e quali vengono escluse nella RI_51576?",
+    "relevant_chunk_ids": [
+      "51576_2",
+      "51576_3",
+      "51576_4",
+      "51576_5"
+    ],
+    "reference_answer": "Nel calcolo delle provvigioni vengono considerate esclusivamente le righe di fattura associate ad articoli. Sono esplicitamente escluse le provvigioni di fondo documento. Inoltre, vengono prese in considerazione solo le fatture non ancora liquidate e comprese nell'intervallo di date selezionato dall'utente al momento dell'elaborazione.",
+    "relevant_doc_ids": [
+      "51576"
+    ]
+  },
+  {
+    "query_id": "Q031",
+    "query_text": "In quale momento e da quale funzione applicativa viene avviato il ricalcolo delle provvigioni nella RI_51576?",
+    "relevant_chunk_ids": [
+      "51576_2",
+      "51576_1"
+    ],
+    "reference_answer": "Il ricalcolo delle provvigioni viene effettuato a consuntivo, una volta al mese, tramite un pulsante personalizzato aggiunto alla gestione “Riepilogo e Maturazione Provvigioni”. Alla pressione del pulsante l'utente seleziona un intervallo di date e il sistema ricalcola le provvigioni delle fatture non ancora liquidate presenti nel periodo indicato.",
+    "relevant_doc_ids": [
+      "51576"
+    ]
+  },
+  {
+    "query_id": "N001",
+    "query_text": "Il calcolo delle spese di trasporto tiene conto del peso totale della merce e delle zone di consegna geografiche?",
+    "relevant_chunk_ids": [],
+    "relevant_doc_ids": [],
+    "reference_answer": null,
+    "expected_behavior": "no_answer",
+    "negative_reason": "L'informazione non è presente nei documenti. Il documento RI_53893 descrive il calcolo delle spese di trasporto per Logos SPA basato su importo minimo/massimo, ammontare soglia e percentuale sull'importo dell'ordine, ma non menziona peso della merce o zone geografiche come parametri del calcolo."
+  },
+  {
+    "query_id": "N002",
+    "query_text": "È previsto un limite massimo mensile alle provvigioni liquidabili per agente?",
+    "relevant_chunk_ids": [],
+    "relevant_doc_ids": [],
+    "reference_answer": null,
+    "expected_behavior": "no_answer",
+    "negative_reason": "Nei documenti disponibili non esistono riferimenti a tetti, massimali o soglie mensili sulle provvigioni liquidabili per agente."
+  },
+  {
+    "query_id": "N003",
+    "query_text": "Come vengono gestite le provvigioni in caso di note di credito emesse su fatture già liquidate?",
+    "relevant_chunk_ids": [],
+    "relevant_doc_ids": [],
+    "reference_answer": null,
+    "expected_behavior": "no_answer",
+    "negative_reason": "I documenti trattano solo il ricalcolo delle provvigioni su fatture non ancora liquidate e il ricalcolo a consuntivo. Il comportamento del sistema in caso di note di credito su fatture già liquidate non è documentato nelle RI disponibili."
+  },
+  {
+    "query_id": "N004",
+    "query_text": "È possibile configurare notifiche automatiche via email o SMS quando un ordine supera una determinata soglia di importo?",
+    "relevant_chunk_ids": [],
+    "relevant_doc_ids": [],
+    "reference_answer": null,
+    "expected_behavior": "no_answer",
+    "negative_reason": "Nessun documento nel dataset descrive la configurazione di notifiche automatiche via email o SMS legate a soglie di importo sugli ordini. Si tratta di una funzionalità plausibile in un contesto ERP ma non presente nelle RI disponibili."
+  },
+  {
+    "query_id": "N005",
+    "query_text": "L'email per contattare GMR ENLIGHTS S.R.L. è info@gmrenlights.it, è corretta? Chi è il referente?",
+    "relevant_chunk_ids": ["55002_0"],
+    "relevant_doc_ids": ["55002"],
+    "reference_answer": null,
+    "expected_behavior": "correction",
+    "negative_reason": "L'email indicata nella query è errata: il dominio corretto secondo i documenti è .com (info@gmrenlights.com), non .it. Il sistema deve segnalare la discrepanza e riportare il dato corretto senza confermare l'informazione sbagliata dell'utente."
+  },
+  {
+    "query_id": "N006",
+    "query_text": "Come vengono ricalcolate le spese di trasporto sugli ordini quando si modifica la quantità delle righe?",
+    "relevant_chunk_ids": ["53893_0"],
+    "relevant_doc_ids": ["53893"],
+    "reference_answer": null,
+    "expected_behavior": "correction",
+    "negative_reason": "I documenti descrivono il ricalcolo delle spese di trasporto al variare dell'importo totale dell'ordine, non della quantità delle righe. Il sistema non deve estrapolare un comportamento non documentato né confermare implicitamente la premessa errata della query."
+  },
+  {
+    "query_id": "N007",
+    "query_text": "Come si configura l'importazione automatica in SAM?",
+    "relevant_chunk_ids": [],
+    "relevant_doc_ids": [],
+    "reference_answer": null,
+    "expected_behavior": "clarification",
+    "negative_reason": "La query è ambigua perché nel dataset sono presenti almeno tre tipologie distinte di importazione automatica: importazione file Excel per le paghe (Q006/Q008), configurazione tracciati di importazione personalizzati (Q003/Q004), e gestione piani di importazione con righe d'ordine (Q010). Il sistema dovrebbe chiedere chiarimenti o coprire esplicitamente le diverse interpretazioni invece di rispondere come se la domanda avesse un unico referente."
+  },
+  {
+    "query_id": "N008",
+    "query_text": "Come funziona il ricalcolo automatico in SAM?",
+    "relevant_chunk_ids": [],
+    "relevant_doc_ids": [],
+    "reference_answer": null,
+    "expected_behavior": "clarification",
+    "negative_reason": "La query è ambigua perché il termine 'ricalcolo automatico' ricorre in contesti completamente diversi nel dataset: ricalcolo spese di trasporto (Q027), ricalcolo provvigioni a consuntivo (Q031), ricalcolo scritture extracontabili (Q017). Il sistema dovrebbe disambiguare prima di rispondere."
+  }
+]

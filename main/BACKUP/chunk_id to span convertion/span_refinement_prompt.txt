@@ -1,0 +1,145 @@
+ISTRUZIONI PER LO SNELLIMENTO DEGLI SPAN — DA USARE IN UNA CHAT CLAUDE SEPARATA
+=================================================================================
+
+COSA FARE:
+1. Apri una nuova chat con Claude
+2. Incolla prima il blocco SYSTEM PROMPT qui sotto
+3. Poi incolla il contenuto del file `span_refinement_input.json` 
+   (generato da prepare_refinement_input.py)
+4. Claude produrrà un JSON con gli span snelliti
+5. Salva l'output come `span_refinement_output.json`
+6. Esegui `apply_refined_spans.py` per aggiornare il gold dataset
+
+
+=================================================================================
+SYSTEM PROMPT (incolla questo per primo nella chat)
+=================================================================================
+
+Sei un assistente specializzato nell'estrazione precisa di informazioni da
+documenti tecnici ERP.
+
+Ti verrà fornito un file JSON con una lista di oggetti. Ogni oggetto contiene:
+- "query_id": identificativo della query
+- "query_text": la domanda dell'utente
+- "span_index": indice dello span all'interno della query
+- "original_span": un frammento di testo estratto da un documento tecnico
+
+Il tuo compito è produrre una versione "snellita" di ogni span, estraendo
+SOLO le porzioni di testo strettamente necessarie per rispondere alla query.
+
+REGOLE TASSATIVE:
+1. Non modificare, parafrasare o riformulare le parole originali — estrai
+   solo sottostringhe del testo originale, esattamente come appaiono.
+2. Puoi omettere frasi o porzioni non pertinenti, ma non puoi cambiare
+   neanche una parola di quelle che tieni.
+3. Se lo span è già minimale e tutto il testo è rilevante, ritorna lo span
+   invariato.
+4. Se lo span non contiene informazioni utili per la query, ritorna una
+   stringa vuota "".
+5. Mantieni il contesto minimo necessario per rendere l'informazione
+   comprensibile — non tagliare così tanto da perdere il senso.
+
+Rispondi SOLO con un JSON valido nel seguente formato, senza testo aggiuntivo:
+[
+  {
+    "query_id": "Q001",
+    "span_index": 0,
+    "refined_span": "testo estratto invariato..."
+  },
+  ...
+]
+
+
+=================================================================================
+COME PREPARARE L'INPUT
+=================================================================================
+
+Esegui questo script per generare `span_refinement_input.json` dal gold dataset:
+
+─────────────────────────────────────────────────────────────────────────────────
+# prepare_refinement_input.py
+
+import json
+
+with open("gold_dataset_v3.json", "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+refinement_input = []
+for q in data:
+    for i, span in enumerate(q.get("relevant_spans", [])):
+        refinement_input.append({
+            "query_id":      q["query_id"],
+            "query_text":    q["query_text"],
+            "span_index":    i,
+            "original_span": span
+        })
+
+with open("span_refinement_input.json", "w", encoding="utf-8") as f:
+    json.dump(refinement_input, f, indent=2, ensure_ascii=False)
+
+print(f"Generati {len(refinement_input)} span da snellire")
+─────────────────────────────────────────────────────────────────────────────────
+
+
+=================================================================================
+COME APPLICARE L'OUTPUT
+=================================================================================
+
+Dopo aver salvato la risposta di Claude come `span_refinement_output.json`,
+esegui questo script per aggiornare il gold dataset:
+
+─────────────────────────────────────────────────────────────────────────────────
+# apply_refined_spans.py
+
+import json
+
+with open("gold_dataset_v3.json", "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+with open("span_refinement_output.json", "r", encoding="utf-8") as f:
+    refined = json.load(f)
+
+# Costruisce un indice per accesso rapido
+refined_index = {
+    (r["query_id"], r["span_index"]): r["refined_span"]
+    for r in refined
+}
+
+for q in data:
+    spans = q.get("relevant_spans", [])
+    if not spans:
+        continue
+    new_spans = []
+    for i, span in enumerate(spans):
+        key = (q["query_id"], i)
+        refined_text = refined_index.get(key, span)  # fallback allo span originale
+        if refined_text:  # scarta span vuoti (LLM ha giudicato non pertinente)
+            new_spans.append(refined_text)
+    q["relevant_spans"]          = new_spans
+    q["relevant_spans_original"] = spans  # backup per confronto
+
+with open("gold_dataset_v4.json", "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+
+print("Salvato gold_dataset_v4.json")
+removed = sum(
+    len(q.get("relevant_spans_original", [])) - len(q.get("relevant_spans", []))
+    for q in data
+)
+print(f"Span rimossi perché non pertinenti: {removed}")
+─────────────────────────────────────────────────────────────────────────────────
+
+
+=================================================================================
+NOTE IMPORTANTI
+=================================================================================
+
+- Se il JSON da snellire è molto lungo, dividilo in batch per query
+  (es. Q000-Q015 prima, Q016-Q031 poi) e concatena i risultati.
+
+- Il campo `relevant_spans_original` nel gold_dataset_v4.json conserva
+  gli span completi originali — utile per confrontare i risultati delle
+  metriche con e senza snellimento.
+
+- La versione finale da usare nella pipeline di valutazione è gold_dataset_v4.json.
+  Aggiorna GOLD_DATASET_PATH in evaluation_pipeline.py di conseguenza.

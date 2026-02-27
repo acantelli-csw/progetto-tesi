@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI
 import json
 import os
-import llm.search as search
+from search import semantic_search, keyword_search
 import tiktoken
 from docx import Document
 from difflib import SequenceMatcher
@@ -91,11 +91,11 @@ def decide_tools(prompt: str) -> dict:
     2. Ricerca per keyword: adatta per termini specifici, nomi di moduli, aziende o funzionalità precise, in particolare plugin/customizzazioni.
 
     Rispondi SEMPRE in formato JSON:
-    {
+    {{
         "use_semantic": True/False,
         "use_keyword": True/False,
         "reason": "<spiegazione breve della decisione, indicando se la richiesta riguarda standard, plugin o entrambe le tipologie>"
-    }
+    }}
 
     Esempi di risposta attesa:
     {few_shot_text}
@@ -254,11 +254,11 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
     sui plugin correlati possono essere utili, mentre se riguarda plugin specifici, concentrati sui documenti che li contengono.
 
     Rispondi SEMPRE in formato JSON:
-    {
-        "relevant_docs": [indici dei documenti utili],
+    {{
+        "relevant_docs": [indici dei documenti utili in ordine crescente di rilevanza],
         "irrelevant_docs": [indici dei documenti non utili],
         "reason": "<breve spiegazione della decisione, indicando se la rilevanza dipende da standard, plugin o entrambe le tipologie>"
-    }
+    }}
 
     Esempi di risposta attesa:
     {few_shot_text}
@@ -402,6 +402,24 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
                 }
             ],
             "answer": "Per verificare i dati importati nel modulo standard di **SAM ERP2**, controlla che tutti i campi siano completi e corretti [1].\n\nDocumenti di riferimento:\n1. RI: [51000](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51000) - Controllo dati importati, Chunk: 4, Autore: Anna, Cliente: Gamma"
+        },
+        {
+            "user_prompt": "L'email per contattare GMR ENLIGHTS S.R.L. è info@gmrenlights.it, è corretta?",
+            "documents": [
+                {
+                    "numero": "55002",
+                    "titolo": "Anagrafica GMR ENLIGHTS",
+                    "progressivo": "0",
+                    "content": "Cliente: GMR ENLIGHTS S.R.L. — Email: info@gmrenlights.com — Referente: Daniele Valentini.",
+                    "autore": "Rossi",
+                    "cliente": "GMR ENLIGHTS S.R.L."
+                }
+            ],
+            "answer": "L'email indicata nella tua domanda non è corretta. Secondo i documenti disponibili, "
+                    "l'indirizzo email di **GMR ENLIGHTS S.R.L.** è **info@gmrenlights.com** (.com, non .it) [1].\n\n"
+                    "Documenti di riferimento:\n"
+                    "1. RI: [55002](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55002) "
+                    "- Anagrafica GMR ENLIGHTS, Chunk: 1, Autore: Rossi, Cliente: GMR ENLIGHTS S.R.L."
         }
     ]
 
@@ -424,6 +442,7 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
     5. Mantieni la risposta chiara, strutturata e basata esclusivamente sui documenti forniti per quanto riguarda le personalizzazioni.
     6. Se non vengono forniti documenti, rispondi in modo naturale e professionale, facendo riferimento solo alle funzionalità standard conosciute di SAM ERP2.
     7. Genera l'output in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
+    8. Se le informazioni fornite dall'utente nella query contraddicono quanto riportato nei documenti (ad esempio un'email, un nome cliente o un parametro errato), segnala esplicitamente la discrepanza e riporta il dato corretto trovato nei documenti, senza confermare il dato errato dell'utente.
     
     Esempi di risposta attesa:
     {few_shot_text}
@@ -481,11 +500,11 @@ def gpt_request(messages):
     all_documents = []
     if tools["use_semantic"]:
         print("\nUso la ricerca SEMANTICA\n")
-        all_documents += search.semantic_search(user_prompt)
+        all_documents += semantic_search(user_prompt)
 
     if tools["use_keyword"]:
         print("\nUso la ricerca per KEYWORDS\n")
-        all_documents += search.keyword_search(user_prompt)
+        all_documents += keyword_search(user_prompt)
 
     # 2 - Selezione documenti in base alla coerenza
     document_selection = []
@@ -493,6 +512,7 @@ def gpt_request(messages):
     if tools["use_semantic"] or tools["use_keyword"]:
         if all_documents:
             document_selection = select_documents(user_prompt, all_documents)
+            print("\n\n===================================\n\n")
             selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
 
     # 3 - Genera risposta finale in modalità stream

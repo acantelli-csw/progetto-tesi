@@ -51,7 +51,7 @@ class ChunkingConfig:
             custom_separators = [
                 #"\nRichiesta Cliente\n",  
                 #"\nSoluzione Proposta\n",
-                "\nAnalisi Tecnica\n",      # Sezione specifica derivante dal sample RI
+                "\nAnalisi Tecnica\n",       # Sezione specifica derivante dal sample RI
                 "\n[OCR immagine embedded]:" # Sezione relativa all'OCR di un immagine
                 "\n\n\n",           # Sezioni separate da righe vuote multiple
                 "\n\n",             # Paragrafi (doppio newline)

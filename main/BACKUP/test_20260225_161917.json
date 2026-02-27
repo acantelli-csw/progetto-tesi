@@ -1,0 +1,803 @@
+{
+  "test_id": "test_20260225_161917",
+  "timestamp": "2026-02-25T16:19:17.057101",
+  "configuration": {
+    "name": "Test Hybrid Search",
+    "search_strategy": "hybrid",
+    "semantic_weight": 0.7,
+    "keyword_weight": 0.3,
+    "embedding_model": "text-embedding-ada-002",
+    "llm_model": "gpt-4.1",
+    "top_k": 10,
+    "note": "Combinazione semantic (70%) + keyword (30%)"
+  },
+  "retrieval_metrics": {
+    "avg_recall_at_3": 0.31364312770562774,
+    "avg_avg_chunk_relevance_top3": 0.765625,
+    "avg_avg_chunk_relevance_top5": 0.6875,
+    "avg_precision_at_3": 0.3958333333333333,
+    "avg_precision_at_5": 0.31875,
+    "avg_recall_at_5": 0.42355248917748917,
+    "avg_retrieval_time": 2.7007717713713646,
+    "avg_recall_at_10": 0.5177759740259741,
+    "avg_precision_at_10": 0.203125,
+    "avg_avg_chunk_relevance_top10": 0.578125
+  },
+  "generation_metrics": {
+    "avg_generation_time": 9.730555534362793,
+    "avg_answer_relevancy": 1.0,
+    "avg_faithfulness": 0.984375,
+    "avg_semantic_similarity": 0.9218149470698749
+  },
+  "per_query_details": [
+    {
+      "query_id": "Q000",
+      "query_text": "Mi serve sapere se info@gmrenlights.com e' l'e-mail giusta per contattare GMR ENLIGHTS S.R.L., puoi confermare? Chi e' la persona di riferimento per il cliente? E quali sono i principali plug-in implementati per GMR ENLIGHTS S.R.L.?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.16666666666666666,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.16666666666666666,
+        "precision_at_10": 0.1,
+        "recall_at_10": 0.16666666666666666,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.45,
+        "retrieval_time": 7.823379039764404
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9365763225204087,
+        "generation_time": 8.82634687423706
+      },
+      "generated_answer": "L’indirizzo e-mail **info@gmrenlights.com** risulta essere quello ufficiale di contatto per **GMR ENLIGHTS S.R.L.** secondo la documentazione disponibile [1][2][3][6]. \n\nLa persona di riferimento per il cliente, come riportato nelle Richieste di Implementazione, è **Daniele Valentini** [2][3][6].\n\nPer quanto riguarda i principali plug-in e personalizzazioni implementati per GMR ENLIGHTS S.R.L., dai documenti emergono le seguenti soluzioni richieste e/o attive:\n- **Integrazione K1**: gestione delle chiamate ai servizi K1WS senza body vuoto [1].\n- **Modifiche grafiche e personalizzazioni POW CRM1**: interventi specifici per la fruibilità da parte di agenti esterni e gestione delle personalizzazioni già presenti [2][3].\n- **Gestione Reclami tramite Schede di non Conformità**: configurazione di un tipo documento “RECLAMO” e relative integrazioni [6].\n- **Plugin su form condivise**: presenza di altri plugin come “Settaconfermaop PI_PMP_Meccanica_EvaOPMagRicStam”, “PlgParziali”, “PI_CSW_RIL_PROC”, che operano sulle stesse form e devono essere considerati in fase di sviluppo [5].\n- **Gestione agenti e opportunità**: personalizzazioni che consentono agli utenti con ruolo “Agente GMR” di visualizzare e modificare contatti e opportunità in base a specifiche regole di anagrafica [4].\n\nSe necessiti di ulteriori dettagli su uno specifico plug-in o personalizzazione, ti consiglio di consultare la relativa RI per approfondimenti.\n\n---\n\n**Documenti di riferimento:**\n\n1. RI: [54271](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54271) - Documento 1, Chunk: 0, Autore: Sistema, Cliente: Test  \n2. RI: [54295](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54295) - Documento 2, Chunk: 0, Autore: Sistema, Cliente: Test  \n3. RI: [56071](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=56071) - Documento 3, Chunk: 0, Autore: Sistema, Cliente: Test  \n4. RI: [55002](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55002) - Documento 4, Chunk: 5, Autore: Sistema, Cliente: Test  \n5. RI: [54000](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54000) - Documento 5, Chunk: 7, Autore: Sistema, Cliente: Test  \n6. RI: [54241](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54241) - Documento 6, Chunk: 0, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q001",
+      "query_text": "In che modo l'automazione dei processi contabili e la gestione automatizzata delle scritture vengono implementate tramite il ribaltamento in contabilita' analitica e il lancio delle ripartizioni mensili extracontabili?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.6666666666666666,
+        "precision_at_5": 0.4,
+        "recall_at_5": 0.6666666666666666,
+        "precision_at_10": 0.3,
+        "recall_at_10": 1.0,
+        "avg_chunk_relevance_top3": 0.8333333333333334,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.7,
+        "retrieval_time": 2.4849135875701904
+      },
+      "generation_metrics": {
+        "faithfulness": 0.5,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9333917151331818,
+        "generation_time": 13.97520136833191
+      },
+      "generated_answer": "L’automazione dei processi contabili e la gestione automatizzata delle scritture in **SAM ERP2** tramite il ribaltamento in contabilità analitica e il lancio delle ripartizioni mensili extracontabili avviene secondo le seguenti modalità:\n\n---\n\n### Ribaltamento in contabilità analitica\n\n- **Al salvataggio di una registrazione contabile**, il sistema apre la maschera della contabilità analitica. L’utente può suddividere (ribaltare) la scrittura su più centri di costo, compilando per ciascuno il campo **Riferi1**. Questo campo funge da collegamento informativo tra la registrazione di partenza e le successive movimentazioni analitiche. Se il campo non viene compilato, il plugin non interviene ulteriormente [1].\n- La registrazione analitica viene creata per ogni riga economica (sia dare che avere), riportando gli estremi del centro di costo, eventuale riga commessa e cliente, se presenti [8][9][10].\n\n---\n\n### Lancio delle Ripartizioni Mensili Extracontabili\n\n- **Periodicamente**, il cliente può eseguire la funzione di “Ripartizione Competenze Mensili”, che genera automaticamente più registrazioni di prima nota extracontabili, suddividendo l’importo in base al periodo di competenza impostato sulla registrazione iniziale [1][3][4][5][6][7].\n- Il sistema effettua la suddivisione delle competenze anche a livello di centro di costo. Ad esempio, per una spesa assicurativa plurimensile, il costo viene ripartito su più mesi in base ai giorni di competenza, e per ogni mese viene generata una scrittura separata [7].\n- Anche la funzione di **Ratei e Risconti** segue la stessa logica e insiste sulla tabella della prima nota analitica, mantenendo il legame del campo **Riferi1** con la scrittura di partenza [2][6].\n\n---\n\n### Gestione del campo Riferi1\n\n- Il campo **Riferi1** viene compilato manualmente durante la prima nota analitica e dovrebbe essere riportato anche sulle scritture generate (ad esempio, con causali RXC e RIS) durante le ripartizioni mensili e la gestione di ratei/risconti, così da mantenere il collegamento informativo tra la scrittura originaria e quelle derivate [3][2].\n- Il cliente richiede che il valore inserito in Riferi1 sia visibile anche sulle registrazioni extracontabili derivate dalla funzione di ripartizione, per garantire tracciabilità e coerenza informativa [3].\n\n---\n\n### Esempio operativo\n\n1. L’utente registra un pagamento assicurativo indicando periodo di competenza (es. dal 29/07 al 31/12).\n2. In contabilità analitica, effettua il ribaltamento sulle righe dei centri di costo, compilando Riferi1.\n3. Esegue la funzione di ripartizione mensile extracontabile: il sistema crea automaticamente tante scritture quanti sono i mesi/periodi di competenza, ciascuna collegata tramite Riferi1 alla scrittura di partenza [4][5][6][7].\n4. Tutte le scritture generate riportano la suddivisione dell’importo e, se correttamente configurato, il valore di Riferi1.\n\n---\n\n### Nota sulle funzionalità\n\n- Queste logiche sono state implementate tramite **personalizzazioni/plugin** su richiesta del cliente, come da documentazione fornita. La gestione dettagliata del campo Riferi1 e la sua propagazione sulle scritture derivate non è descritta come funzionalità standard, ma come esigenza specifica [1][2][3].\n\n---\n\n## Documenti di riferimento:\n1. RI: [55459](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55459) - Documento 1, Chunk: 2, Autore: Sistema, Cliente: Test\n2. RI: [55459](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55459) - Documento 2, Chunk: 4, Autore: Sistema, Cliente: Test\n3. RI: [55459](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55459) - Documento 3, Chunk: 1, Autore: Sistema, Cliente: Test\n4. RI: [55459](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55459) - Documento 4, Chunk: 14, Autore: Sistema, Cliente: Test\n5. RI: [55459](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55459) - Documento 5, Chunk: 18, Autore: Sistema, Cliente: Test\n6. RI: [55459](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55459) - Documento 6, Chunk: 10, Autore: Sistema, Cliente: Test\n7. RI: [55459](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55459) - Documento 7, Chunk: 3, Autore: Sistema, Cliente: Test\n8. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 8, Chunk: 7, Autore: Sistema, Cliente: Test\n9. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 9, Chunk: 7, Autore: Sistema, Cliente: Test\n10. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 10, Chunk: 17, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q002",
+      "query_text": "Come si gestisce la relazione tra Area Manager e agenti per la visibilita' dei contatti e delle opportunita' nel portale CRM, considerando le regole specifiche per il profilo Area Manager?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.3333333333333333,
+        "precision_at_5": 0.4,
+        "recall_at_5": 0.6666666666666666,
+        "precision_at_10": 0.3,
+        "recall_at_10": 1.0,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 0.9,
+        "avg_chunk_relevance_top10": 0.65,
+        "retrieval_time": 2.31057071685791
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9152857702331115,
+        "generation_time": 9.618378162384033
+      },
+      "generated_answer": "Per la gestione della relazione tra **Area Manager** e agenti, e la conseguente visibilità di contatti e opportunità nel portale CRM1 di SAM ERP2, sono state definite regole e personalizzazioni specifiche, come richiesto dal cliente GMR ENLIGHTS S.R.L. [4].\n\n### Regole di visibilità per il profilo Area Manager\n\n#### 1. Struttura della relazione\n- È prevista una tabella dedicata che lega **Agente (utente web)**, **Area Manager (agenti.id)**, **Direttore Commerciale (agenti.id)**, **Zona (regioni.id)** e **Nazione (nazioni.id)**.  \n  Questa tabella viene gestita a livello database (senza interfaccia utente) e serve a determinare le associazioni tra agenti, area manager e le relative zone [2].\n- Gli agenti aggiuntivi possono essere collegati a un contatto tramite una select multipla. Questo serve solo alla visibilità lato portale CRM, e non viene riportato sull’anagrafica cliente [7][10].\n\n#### 2. Visibilità dei contatti\n- **Area Manager** visualizza:\n  - Tutti i contatti degli agenti a lui associati tramite la struttura agenti standard.\n  - Tutti i contatti delle zone (regioni) a lui associate tramite la tabella relazionale sopra descritta [3].\n\n#### 3. Visibilità delle opportunità\n- **Area Manager** visualizza:\n  - Le opportunità degli agenti a lui associati in cui gli stessi agenti sono indicati come Proprietario, Agente 1 o Agente 2.\n  - Le opportunità delle zone (regioni) a lui associate [1][3].\n\n#### 4. Gestione agenti su contatti e opportunità\n- Su ogni contatto è possibile associare uno o più agenti (sia tramite campo agente anagrafico che tramite la gestione \"Altri Agenti\").\n- Il campo \"Agente 2\" è una select2 che legge dalla tabella agenti.\n- In fase di inserimento/modifica contatto, si può agganciare più agenti tramite una select multipla [7][10].\n\n#### 5. Ruoli personalizzati\n- Sono stati creati ruoli personalizzati per Agente, Area Manager e Direttore Commerciale. La gestione delle regole di visibilità avviene tramite questi ruoli [2][7].\n\n### Sintesi operativa per Area Manager\n- L’Area Manager può visualizzare e modificare tutti i contatti e le opportunità degli agenti e delle zone/regioni a lui associati, secondo la struttura e le relazioni definite nelle tabelle dedicate.\n- La relazione tra Area Manager e Agenti viene gestita tramite la struttura agenti standard e la tabella relazionale per zone/nazioni.\n- L’assegnazione degli agenti ai contatti/opportunità avviene tramite selezione multipla, visibile sia da portale WEB che da interfaccia SAM [7][10].\n\n> **Nota:** Queste regole di visibilità e la struttura relazionale sono una personalizzazione specifica per il cliente GMR ENLIGHTS S.R.L. e non fanno parte della dotazione standard di SAM ERP2.\n\n---\n\n### Documenti di riferimento:\n1. RI: [55002](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55002) - Documento 1, Chunk: 1, Autore: Sistema, Cliente: Test  \n2. RI: [55002](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55002) - Documento 2, Chunk: 4, Autore: Sistema, Cliente: Test  \n3. RI: [55002](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55002) - Documento 3, Chunk: 6, Autore: Sistema, Cliente: Test  \n4. RI: [55002](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55002) - Documento 4, Chunk: 0, Autore: Sistema, Cliente: Test  \n5. RI: [55002](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55002) - Documento 7, Chunk: 9, Autore: Sistema, Cliente: Test  \n6. RI: [55002](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55002) - Documento 10, Chunk: 3, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q003",
+      "query_text": "Come si fa ad usare il file di configurazione per schedulare job di importazione e anche per attivare personalizzazioni esterne quando si importa file di testo usando tracciato XML? spiegami come funziona tutto insieme, tipo dove si mette nome del plug-in e come si fa a far partire operazioni specifiche, e come il file di configurazione serve sia per la sequenza dei job che per le personalizzazioni.",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.0,
+        "recall_at_5": 0.0,
+        "precision_at_10": 0.0,
+        "recall_at_10": 0.0,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 1.0,
+        "avg_chunk_relevance_top10": 0.8,
+        "retrieval_time": 2.7880005836486816
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9199811482182254,
+        "generation_time": 11.010291337966919
+      },
+      "generated_answer": "Per gestire la schedulazione dei job di importazione e l’attivazione di personalizzazioni esterne in **SAM ERP2** tramite file di configurazione e tracciato XML, il funzionamento complessivo è il seguente:\n\n---\n\n### 1. **File di configurazione e job di importazione**\n\n- Le modalità di importazione vengono definite in **Job**, programmabili tramite appositi file di configurazione.  \n- I **tracciati** (in formato XML) specificano le logiche di importazione delle informazioni dal file di testo.  \n- Il programma di importazione può essere eseguito manualmente o schedulato tramite gli strumenti del sistema operativo, utilizzando queste configurazioni [7][8][9][10].\n\n---\n\n### 2. **Attivazione di personalizzazioni esterne (plug-in)**\n\n- Se la decodifica del file di testo usa un **tracciato XML**, è possibile richiamare procedure di un plug-in esterno per personalizzare il job di importazione.\n- Il file di configurazione del tracciato XML deve contenere:\n  - **Nome del plug-in**\n  - **Nome delle funzioni** da eseguire\n- In base agli **eventi di attivazione** previsti, puoi eseguire operazioni mirate come:\n  - Modificare i dati del file di testo\n  - Modificare i valori nella tabella temporanea\n  - Eseguire operazioni specifiche dopo il salvataggio del file XML risultante\n- Questo consente di usare lo stesso tracciato generico, ma attivare operazioni specifiche in base ai dati letti [1][2][3][4][5][6].\n\n---\n\n### 3. **Come funziona tutto insieme**\n\n- **Configurazione**: Nel file di configurazione del job e nel tracciato XML indichi la sequenza dei job e le eventuali personalizzazioni (nome plug-in e funzioni).\n- **Schedulazione**: Il programma eseguibile legge la configurazione e può essere schedulato per lanciare i job in automatico.\n- **Personalizzazione**: In fase di importazione, agli eventi previsti, il sistema richiama le funzioni del plug-in specificato per eseguire logiche aggiuntive.\n- **Flessibilità**: Puoi così riutilizzare tracciati generici e, tramite configurazione, decidere se e quando attivare personalizzazioni specifiche sui dati.\n\n---\n\n### 4. **Dove si mettono le informazioni**\n\n- Tutti i riferimenti ai plug-in (nome, funzioni) e la sequenza dei job vengono **definiti nel file di configurazione del tracciato XML** relativo all’importazione.\n- La schedulazione del job avviene tramite il programma eseguibile, che utilizza questi file per sapere cosa e come importare ed eventualmente quali personalizzazioni attivare.\n\n---\n\n### **Riferimenti documentali**\n\n1. RI: [55749](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55749) - Documento 1, Chunk: 10, Autore: Sistema, Cliente: Test\n2. RI: [53513](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53513) - Documento 2, Chunk: 10, Autore: Sistema, Cliente: Test\n3. RI: [53512](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53512) - Documento 3, Chunk: 10, Autore: Sistema, Cliente: Test\n4. RI: [53411](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53411) - Documento 4, Chunk: 10, Autore: Sistema, Cliente: Test\n5. RI: [52795](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=52795) - Documento 5, Chunk: 10, Autore: Sistema, Cliente: Test\n6. RI: [45687](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45687) - Documento 6, Chunk: 21, Autore: Sistema, Cliente: Test\n7. RI: [52795](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=52795) - Documento 7, Chunk: 1, Autore: Sistema, Cliente: Test\n8. RI: [53411](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53411) - Documento 8, Chunk: 1, Autore: Sistema, Cliente: Test\n9. RI: [53512](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53512) - Documento 9, Chunk: 1, Autore: Sistema, Cliente: Test\n10. RI: [53513](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53513) - Documento 10, Chunk: 1, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q004",
+      "query_text": "“Come si fa la configurazione autonoma dei tracciati di importazione e come funziona il processo di import dei documenti con le specifiche configurabili? cioe, se voglio importare un file di testo con specifiche diverse, come posso gestire la decodifica e la preparazione del file XML, e la schedulazione del processo, usando i tracciati configurabili?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.14285714285714285,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.14285714285714285,
+        "precision_at_10": 0.1,
+        "recall_at_10": 0.14285714285714285,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 1.0,
+        "avg_chunk_relevance_top10": 1.0,
+        "retrieval_time": 2.324030876159668
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9149439996932207,
+        "generation_time": 11.748033285140991
+      },
+      "generated_answer": "Per la **configurazione autonoma dei tracciati di importazione** e la gestione del processo di import dei documenti con specifiche configurabili in SAM ERP2, è disponibile una soluzione tramite plug-in personalizzato che permette una gestione flessibile dei tracciati e la schedulazione dei processi.\n\n### Funzionamento generale del processo di importazione\n\nIl sistema esegue l’importazione dei documenti in tre fasi principali:\n\n1. **Decodifica del file di testo**  \n   - Il sistema interpreta le informazioni contenute nel file di testo in base al tracciato selezionato.\n   - I dati vengono memorizzati in una tabella temporanea, secondo le specifiche impostate per ogni campo.\n   - È possibile definire nel tracciato le regole di decodifica per rendere i valori compatibili con il sistema ERP [1][2][3][4][5][6].\n\n2. **Preparazione del file XML**  \n   - Dalla tabella temporanea, il sistema genera il file XML necessario per l’importazione.\n   - Questa fase permette di individuare e correggere eventuali errori prima della vera e propria importazione [1][2][3][4][5][6].\n\n3. **Esecuzione della procedura “XML Import”**  \n   - Il file XML viene importato nel sistema tramite la procedura dedicata [1][2][3][4][5][6].\n\n### Configurazione autonoma e flessibilità\n\n- La soluzione proposta prevede lo **sviluppo di un plug-in** attivabile su qualsiasi finestra di gestione di SAM ERP2.\n- L’importazione può essere configurata tramite:\n  - **Job**, programmabili in file di configurazione.\n  - **Tracciati in formato XML**, dove puoi definire le logiche di importazione delle informazioni.\n  - In alternativa ai tracciati XML, puoi utilizzare il tool **XML Generator** per elaborare il file di testo secondo le logiche definite nella configurazione [7][8][9][10].\n\n### Schedulazione del processo\n\n- È previsto lo sviluppo di un programma eseguibile che consente di eseguire l’importazione dei Job richiesti.\n- Questo programma può essere schedulato tramite gli strumenti standard del sistema operativo, permettendo così automazione e pianificazione delle importazioni [7][8][9][10].\n\n### Gestione di tracciati diversi\n\n- Se desideri importare file di testo con specifiche diverse, puoi:\n  - Configurare un nuovo tracciato XML che definisce come decodificare e mappare i dati.\n  - Personalizzare le logiche di decodifica e preparazione dei dati per garantire la compatibilità con il sistema ERP.\n  - Utilizzare la funzione di schedulazione per automatizzare l’importazione secondo le tue esigenze.\n\n**Nota:** Tutte queste funzionalità sono state realizzate tramite plug-in e personalizzazioni specifiche, non sono parte della dotazione standard di SAM ERP2, ma sono disponibili su richiesta o come progetto custom [7][8][9][10].\n\n---\n\n### Documenti di riferimento\n\n1. RI: [55749](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55749) - Documento 1, Chunk: 7, Autore: Sistema, Cliente: Test  \n2. RI: [53513](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53513) - Documento 2, Chunk: 7, Autore: Sistema, Cliente: Test  \n3. RI: [53512](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53512) - Documento 3, Chunk: 7, Autore: Sistema, Cliente: Test  \n4. RI: [53411](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53411) - Documento 4, Chunk: 7, Autore: Sistema, Cliente: Test  \n5. RI: [52795](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=52795) - Documento 5, Chunk: 7, Autore: Sistema, Cliente: Test  \n6. RI: [45687](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45687) - Documento 6, Chunk: 18, Autore: Sistema, Cliente: Test  \n7. RI: [52795](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=52795) - Documento 7, Chunk: 1, Autore: Sistema, Cliente: Test  \n8. RI: [45687](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45687) - Documento 8, Chunk: 9, Autore: Sistema, Cliente: Test  \n9. RI: [53411](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53411) - Documento 9, Chunk: 1, Autore: Sistema, Cliente: Test  \n10. RI: [53512](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53512) - Documento 10, Chunk: 1, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q005",
+      "query_text": "Come si puo' abilitare la personalizzazione esterna tramite plug-in sia nei processi di esportazione che di importazione EDI, e quali sono i requisiti di configurazione per ciascun caso?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.16666666666666666,
+        "precision_at_10": 0.5,
+        "recall_at_10": 0.8333333333333334,
+        "avg_chunk_relevance_top3": 0.5,
+        "avg_chunk_relevance_top5": 0.5,
+        "avg_chunk_relevance_top10": 0.5,
+        "retrieval_time": 2.2578060626983643
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9375404371669442,
+        "generation_time": 11.93910527229309
+      },
+      "generated_answer": "Per abilitare la **personalizzazione esterna tramite plug-in** nei processi di esportazione e importazione EDI in **SAM ERP2**, sono previsti due scenari distinti, ciascuno con requisiti di configurazione specifici:\n\n---\n\n### 1. Personalizzazione esterna nell’**esportazione EDI**\n\n- **Quando è possibile**: In determinati momenti successivi all’esportazione, è possibile richiamare funzioni personalizzate di un plug-in esterno al tool di Export EDI.\n- **Cosa consente**: Personalizzare un Job, un tracciato o un’interfaccia di esportazione. Questo permette di riutilizzare lo stesso tracciato di esportazione generico e applicare operazioni specifiche in base al Job selezionato.\n- **Configurazione richiesta**:  \n  - All’interno del file di configurazione dei Job di esportazione, è necessario indicare:\n    - il nome del plug-in\n    - il nome della funzione da eseguire sull’evento di attivazione desiderato.\n- **Nota**: Eventuali richieste per nuove funzionalità personalizzate esterne al tool dovranno essere valutate separatamente caso per caso.\n\n---\n\n### 2. Personalizzazione esterna nell’**importazione EDI**\n\n- **Quando è possibile**: Se per la decodifica dei file di testo da importare viene utilizzato il tracciato XML, è possibile richiamare, in determinati momenti dell’elaborazione del file, funzioni personalizzate di un plug-in esterno al tool di Import EDI.\n- **Cosa consente**: Personalizzare un Job di importazione in base ai dati letti dal file. Questo permette di riutilizzare lo stesso tracciato di importazione generico e applicare operazioni specifiche a seconda dei dati d’origine.\n- **Configurazione richiesta**:  \n  - All’interno del file di configurazione del tracciato XML, è necessario indicare:\n    - il nome del plug-in\n    - il nome della funzione da eseguire sull’evento di attivazione desiderato.\n- **Nota**: Anche in questo caso, eventuali richieste per nuove funzionalità personalizzate esterne al tool dovranno essere valutate separatamente.\n\n---\n\n### Riepilogo requisiti di configurazione\n\n| Processo         | File di configurazione da modificare         | Parametri necessari                 |\n|------------------|---------------------------------------------|-------------------------------------|\n| Esportazione EDI | File di configurazione del Job di esportazione | Nome del plug-in, nome funzione     |\n| Importazione EDI | File di configurazione del tracciato XML       | Nome del plug-in, nome funzione     |\n\n---\n\n**Importante:** In entrambi i casi, la personalizzazione è abilitata tramite la configurazione del plug-in e della funzione da richiamare in corrispondenza di specifici eventi. Ogni ulteriore esigenza di funzionalità personalizzate sarà oggetto di valutazione specifica.\n\n---\n\nDocumenti di riferimento:\n1. RI: [55564](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55564) - Documento 1, Chunk: 6, Autore: Sistema, Cliente: Test\n2. RI: [45687](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45687) - Documento 4, Chunk: 7, Autore: Sistema, Cliente: Test\n3. RI: [45687](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45687) - Documento 5, Chunk: 12, Autore: Sistema, Cliente: Test\n4. RI: [53411](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53411) - Documento 6, Chunk: 4, Autore: Sistema, Cliente: Test\n5. RI: [52795](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=52795) - Documento 7, Chunk: 4, Autore: Sistema, Cliente: Test\n6. RI: [53513](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53513) - Documento 8, Chunk: 4, Autore: Sistema, Cliente: Test\n7. RI: [53512](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53512) - Documento 9, Chunk: 4, Autore: Sistema, Cliente: Test\n8. RI: [55749](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55749) - Documento 10, Chunk: 4, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q006",
+      "query_text": "Mi spieghi come funziona l'importazione file excel per le paghe? Se io ho un file excel con colonne diverse, tipo una colonna per il conto contabile e poi importi separati dare e avere, il plugin riesce a generare la scrittura contabile automatica? E se invece il file ha solo una colonna importo e una segno D/A, cambia qualcosa nell'importazione payroll?",
+      "retrieval_metrics": {
+        "precision_at_3": 1.0,
+        "recall_at_3": 0.42857142857142855,
+        "precision_at_5": 0.8,
+        "recall_at_5": 0.5714285714285714,
+        "precision_at_10": 0.4,
+        "recall_at_10": 0.5714285714285714,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.6,
+        "retrieval_time": 2.3768668174743652
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9218908016062833,
+        "generation_time": 11.956425666809082
+      },
+      "generated_answer": "Per l’importazione dei file Excel delle paghe e la generazione automatica delle scritture contabili in **SAM ERP2** viene utilizzato un **plugin personalizzato** che gestisce diversi tracciati di file, adattandosi sia a colonne distinte per Dare/Avere sia a un’unica colonna Importo con segno D/A.\n\n### Funzionamento Generale del Plugin\n\n- **Accesso:** Dalla gestione “Prima Nota” è disponibile un pulsante dedicato all’import delle paghe. Premendolo, si apre una maschera per selezionare il/i file Excel da importare, impostare le causali e le date di registrazione e competenza [2], [10].\n- **Configurazione:** Un file di configurazione consente di definire gli ID delle causali contabili di default, i conti da utilizzare e la mappatura delle colonne del file Excel [2].\n\n### Gestione dei Tracciati File\n\n#### 1. File con colonne separate “Dare” e “Avere”\n- Il plugin riconosce e gestisce file Excel con colonne specifiche per “Dare” e “Avere” (es. colonne M e N).\n- In fase di importazione, il sistema verifica quale colonna contiene l’importo e attribuisce il segno opportuno in base alla colonna compilata [3], [5], [8].\n- Vengono lette anche eventuali colonne che specificano se il movimento è di Conto Economico (CE) o Stato Patrimoniale (SP), per indirizzare la registrazione sul conto corretto [5], [8].\n- La voce contabile viene identificata tramite la descrizione riportata nel file Excel, che deve essere tabellata in SAM ERP2 per la corretta associazione al codice interno [4].\n\n#### 2. File con una sola colonna “Importo” e segno D/A\n- Il plugin è in grado di importare anche file che hanno una sola colonna “Importo” e una colonna separata che indica il segno (Dare/Avere, tipicamente D/A) [3].\n- In questo caso, la logica interna del plugin interpreta il segno e attribuisce la movimentazione nella scrittura contabile di conseguenza, senza necessità delle colonne distinte per Dare/Avere.\n- Non vengono modificate le logiche di importazione già esistenti: il plugin verifica la presenza dell’importo nella colonna “Importo” oppure nelle colonne “Dare” e “Avere” e si comporta di conseguenza [3].\n\n### Generazione Scrittura Contabile Automatica\n\n- In entrambi i casi, al termine dei controlli, il plugin genera automaticamente la scrittura contabile e, se configurato, anche le scritture extra-contabili (ad esempio per il dettaglio centri di costo) [1], [2].\n- Se ci sono anomalie (es. conto non trovato), la procedura si interrompe e viene segnalato l’errore [9].\n\n### Note Importanti\n- È fondamentale che le descrizioni delle voci contabili nel file Excel siano già mappate nella tabella interna di SAM ERP2 [4].\n- L’anagrafica dipendente deve essere presente e aggiornata per una corretta imputazione [5].\n- Le regole di importazione e la struttura delle scritture sono configurabili tramite il file di configurazione del plugin [2].\n\n---\n\n## Documenti di riferimento:\n1. RI: [51901](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51901) - Documento 1, Chunk: 0, Autore: Sistema, Cliente: Test\n2. RI: [51901](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51901) - Documento 2, Chunk: 1, Autore: Sistema, Cliente: Test\n3. RI: [54803](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54803) - Documento 3, Chunk: 2, Autore: Sistema, Cliente: Test\n4. RI: [50858](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=50858) - Documento 4, Chunk: 4, Autore: Sistema, Cliente: Test\n5. RI: [50858](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=50858) - Documento 5, Chunk: 1, Autore: Sistema, Cliente: Test\n6. RI: [50858](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=50858) - Documento 8, Chunk: 9, Autore: Sistema, Cliente: Test\n7. RI: [50858](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=50858) - Documento 10, Chunk: 6, Autore: Sistema, Cliente: Test\n8. RI: [38117](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=38117) - Documento 9, Chunk: 4, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q007",
+      "query_text": "“Come avviene il recupero dei conti tramite FullCodSearch quando ci sono anomalie nella ripartizione analitica per centro di costo e come viene gestita la ricerca dei conti se i codici non corrispondono tra il file e SAM? Spiega anche cosa succede se manca il conto in una riga del file e se il tracciato CSV viene modificato.”",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.5,
+        "precision_at_5": 0.6,
+        "recall_at_5": 0.75,
+        "precision_at_10": 0.3,
+        "recall_at_10": 0.75,
+        "avg_chunk_relevance_top3": 0.8333333333333334,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.55,
+        "retrieval_time": 4.218533277511597
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9485558842574994,
+        "generation_time": 8.97714376449585
+      },
+      "generated_answer": "Ecco come avviene il recupero dei conti tramite **FullCodSearch** e la gestione delle anomalie nella ripartizione analitica per centro di costo, secondo le specifiche del plugin/personalizzazione documentata:\n\n### Recupero dei conti tramite FullCodSearch\n- Il sistema cerca inizialmente il conto utilizzando il campo **FullCodSearch**.\n- Se la ricerca non ha esito positivo, la procedura continua utilizzando un campo esterno della tabella conti, che viene scelto e mappato dal cliente tramite un file di configurazione (ad esempio, annotazioni, riferi1, ecc.).\n- Questo meccanismo consente di gestire una **trascodifica** tra i codici dei conti presenti nel file e quelli utilizzati in SAM ERP2, nel caso non coincidano [1][2].\n\n### Gestione delle anomalie nella ripartizione analitica\n- Se non vengono riscontrate anomalie durante la fase di controllo, si procede con la registrazione in prima nota, raggruppando gli importi per conto.\n- Successivamente, viene eseguita la ripartizione analitica in base ai centri di costo (CDC) [1][2][3].\n- Se invece si rilevano anomalie (ad esempio, dati mancanti o non coerenti), la procedura viene **interrotta**, tutte le modifiche vengono annullate e un messaggio comunica all’utente la natura del problema. Sarà quindi responsabilità dell’utente correggere l’anomalia, integrando o correggendo il codice mancante [3][6].\n\n### Ricerca dei conti con codici non corrispondenti\n- Se i codici dei conti presenti nel file non corrispondono a quelli di SAM, la funzionalità di trascodifica tramite il campo esterno (mappato a scelta del cliente) permette di associare correttamente i conti tra i due sistemi [1][2].\n\n### Gestione delle righe senza conto\n- Tutte le righe del file che **non contengono un conto** vengono **escluse dalla registrazione**. Queste righe rappresentano importi parziali raggruppati per tipologia e non vengono importate [1][2].\n\n### Modifica del tracciato CSV\n- Qualsiasi modifica al tracciato del file CSV **richiede l’adeguamento del plugin**. Sarà quindi necessario aggiornare la personalizzazione per gestire le nuove strutture o campi del file [1][2].\n\n---\n\n## Sintesi operativa\n1. Ricerca conto via FullCodSearch → se non trovato, ricerca tramite campo esterno mappato.\n2. Se tutto regolare, registrazione in prima nota e ripartizione analitica per CDC.\n3. In caso di anomalie, procedura bloccata e richiesta correzione all’utente.\n4. Righe senza conto escluse dalla registrazione.\n5. Cambi tracciato CSV = aggiornamento del plugin necessario.\n\n---\n\n### Documenti di riferimento:\n1. RI: [38117](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=38117) - Documento 1, Chunk: 5, Autore: Sistema, Cliente: Test  \n2. RI: [38117](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=38117) - Documento 2, Chunk: 2, Autore: Sistema, Cliente: Test  \n3. RI: [51901](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51901) - Documento 3, Chunk: 3, Autore: Sistema, Cliente: Test  \n4. RI: [31415](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=31415) - Documento 6, Chunk: 20, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q008",
+      "query_text": "“Come si fa per importare le voci contabili dello studio paghe da excel se manca il codice strutturato e come si collega il piano dei conti dello studio paghe con quello di SAM?”",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.5,
+        "precision_at_5": 0.4,
+        "recall_at_5": 0.5,
+        "precision_at_10": 0.3,
+        "recall_at_10": 0.75,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.8,
+        "avg_chunk_relevance_top10": 0.7,
+        "retrieval_time": 4.212047100067139
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9471232960369196,
+        "generation_time": 12.761480808258057
+      },
+      "generated_answer": "Per importare le voci contabili dello studio paghe da Excel in **SAM ERP2** quando manca il codice strutturato, e per collegare il piano dei conti dello studio paghe con quello di SAM, è stata implementata una soluzione personalizzata (add-on/plugin) che prevede i seguenti passaggi:\n\n---\n\n### 1. Gestione delle voci contabili senza codice strutturato\n\n- Nel file Excel dello studio paghe, la colonna K contiene la **descrizione** della voce contabile, ma non un codice strutturato.  \n- È quindi necessario **tabellare** le diverse descrizioni delle voci contabili in una gestione dedicata su SAM ERP2, associando ciascuna descrizione a un codice interno di SAM (non presente nel file Excel).  \n- Il sistema di importazione si basa quindi sulla **Descrizione della Voce Contabile** per la corretta identificazione [2].\n\n**Struttura tabella voci contabili personalizzata:**\n- Codice Voce (interno SAM)\n- Descrizione Voce (come da Excel)\n\n---\n\n### 2. Collegamento tra piano dei conti dello studio paghe e quello di SAM\n\n- Viene utilizzata una **tabella di transcodifica**: per ogni conto dello studio paghe (codice/descrizione), si associa il corrispondente conto di SAM.\n- La tabella di transcodifica è gestibile direttamente in SAM ERP2 tramite una finestra di inserimento/modifica, accessibile da un’apposita voce di menù [1], [9].\n- La struttura della tabella prevede chiavi referenziali per evitare duplicati e permette sia relazioni uno-a-uno sia molti-a-uno tra i conti dello studio paghe e quelli di SAM [7], [9].\n\n**Esempio struttura tabella di transcodifica (Ext_TrasPagheConti):**\n- COD_EXT: codice conto studio paghe\n- DES_EXT: descrizione conto studio paghe\n- COD_DARE: codice conto SAM (DARE)\n- COD_AVERE: codice conto SAM (AVERE)\n- DES_DARE/DES_AVERE: descrizione conto SAM\n\n> NB: Per lo stesso conto contabile dello studio paghe possono essere associati due conti SAM diversi, uno per DARE e uno per AVERE [5].\n\n---\n\n### 3. Flusso operativo per l'importazione\n\n1. **Prima configurazione:**  \n   - Popolare le tabelle di transcodifica (conti, centri di costo, dipendenti) tramite le gestioni dedicate in SAM ERP2 [4].\n2. **Importazione:**  \n   - Utilizzare il tool di importazione (presente come pulsante nella finestra \"Prima nota e Saldaconto\") per caricare il file fornito dallo studio paghe (Excel o XML) [5], [6].\n   - Il plugin importa i dati e associa le voci contabili tramite la tabella di transcodifica, permettendo la registrazione contabile automatica e le successive analisi statistiche [3], [8].\n\n---\n\n### 4. Note aggiuntive\n\n- Tutte queste funzionalità (gestione tabellare delle descrizioni, tabella di transcodifica, importazione automatica) sono state sviluppate tramite **plugin/add-on personalizzato** e non fanno parte delle funzionalità standard di SAM ERP2 [6], [7], [9].\n- L’utente può accedere e gestire queste tabelle tramite menù dedicati, con funzioni standard come ordinamento, ricerca, modifica, ecc. [9].\n\n---\n\n## Documenti di riferimento\n\n1. RI: [47198](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=47198) - Documento 1, Chunk: 1, Autore: Sistema, Cliente: Test  \n2. RI: [50858](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=50858) - Documento 2, Chunk: 4, Autore: Sistema, Cliente: Test  \n3. RI: [31415](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=31415) - Documento 3, Chunk: 1, Autore: Sistema, Cliente: Test  \n4. RI: [31415](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=31415) - Documento 4, Chunk: 2, Autore: Sistema, Cliente: Test  \n5. RI: [31415](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=31415) - Documento 5, Chunk: 3, Autore: Sistema, Cliente: Test  \n6. RI: [31551](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=31551) - Documento 6, Chunk: 3, Autore: Sistema, Cliente: Test  \n7. RI: [47198](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=47198) - Documento 7, Chunk: 0, Autore: Sistema, Cliente: Test  \n8. RI: [31415](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=31415) - Documento 8, Chunk: 11, Autore: Sistema, Cliente: Test  \n9. RI: [31415](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=31415) - Documento 9, Chunk: 16, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q009",
+      "query_text": "Come la personalizzazione dell'elaborazione fabbisogni aiuta a dare flessibilita' nell'analisi dei fabbisogni per ogni plant dopo la fusione delle tre societa' in EMMI DESSERT ITALIA?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.4,
+        "precision_at_5": 0.6,
+        "recall_at_5": 0.6,
+        "precision_at_10": 0.3,
+        "recall_at_10": 0.6,
+        "avg_chunk_relevance_top3": 0.8333333333333334,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.55,
+        "retrieval_time": 2.67527174949646
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9472013586754325,
+        "generation_time": 8.11897587776184
+      },
+      "generated_answer": "La personalizzazione dell’elaborazione fabbisogni sviluppata per EMMI DESSERT ITALIA offre una significativa flessibilità nell’analisi dei fabbisogni per ogni plant, aspetto particolarmente rilevante dopo la fusione delle tre società. Di seguito i principali elementi di flessibilità introdotti e come questi rispondono alle esigenze di analisi post-fusione:\n\n### 1. Analisi per singolo plant o globale\nLa soluzione permette di eseguire l’MRP (Material Requirements Planning) sia per ogni singolo plant che in modalità globalizzata. Questo significa che puoi:\n- Analizzare i fabbisogni distintamente per ciascuno dei tre stabilimenti mantenuti dopo la fusione.\n- Eseguire un “lancio globale” che, con un’unica elaborazione MRP, considera i criteri specifici impostati per ogni plant [1].\n\n### 2. Sequenza automatica delle elaborazioni\nLa personalizzazione consente all’MRP di eseguire in modo sequenziale e concatenato le elaborazioni relative alle diverse configurazioni di plant. L’output finale aggrega i risultati, mantenendo la distinzione dei fabbisogni e delle giacenze per ogni plant, senza ricalcolare i valori in modo globale ma mantenendo la situazione specifica di ciascun plant [4].\n\n### 3. Generazione documenti specifici per plant\nA valle dell’elaborazione, l’MRP genera Ordini di Acquisto (OA) e Ordini di Produzione (OP) associati ai singoli plant. Il sistema utilizza tipi di documento specifici per ogni plant, garantendo così la corretta identificazione e tracciabilità degli ordini legati ai diversi stabilimenti [1].\n\n### 4. Gestione fornitori preferenziali per articolo e plant\nLa personalizzazione prevede la possibilità di associare un fornitore preferenziale non solo per articolo, ma anche per plant. Questo permette una gestione più puntuale e aderente alle esigenze operative dei singoli stabilimenti [1].\n\n### 5. Flessibilità nella configurazione delle logiche\nL’implementazione fa ricorso a funzioni configurabili che consentono di modificare facilmente le logiche di recupero dati (ad esempio, per CDC/DIVISIONE), senza dover intervenire direttamente sul codice. Questo garantisce una maggiore adattabilità e velocità di risposta a eventuali esigenze future [5].\n\n---\n\n**In sintesi:**  \nQuesta personalizzazione consente all’azienda di mantenere una visione dettagliata e flessibile dei fabbisogni per ogni plant, pur gestendo in modo centralizzato e coordinato le elaborazioni MRP. L’approccio adottato risponde perfettamente alle necessità di una realtà post-fusione, dove è fondamentale sia l’analisi puntuale per ciascun sito produttivo sia la possibilità di unificare i processi dove necessario.\n\n---\n\n### Documenti di riferimento:\n1. RI: [38312](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=38312) - Documento 1, Chunk: 1, Autore: Sistema, Cliente: Test  \n2. RI: [38312](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=38312) - Documento 2, Chunk: 0, Autore: Sistema, Cliente: Test  \n3. RI: [38312](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=38312) - Documento 4, Chunk: 4, Autore: Sistema, Cliente: Test  \n4. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 5, Chunk: 15, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q010",
+      "query_text": "Quando importo il piano, come si gestisce le righe di ordine e la data di importazione del piano, e che succede se ci sono errori o quantita' in eccedenza?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.25,
+        "precision_at_10": 0.3,
+        "recall_at_10": 0.75,
+        "avg_chunk_relevance_top3": 0.8333333333333334,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.65,
+        "retrieval_time": 2.370962381362915
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9110754220219238,
+        "generation_time": 14.092625141143799
+      },
+      "generated_answer": "Quando importi un piano di consegna in **SAM ERP2** secondo la personalizzazione descritta nei documenti forniti, la gestione delle righe d’ordine, della data di importazione e delle eventuali anomalie segue queste regole:\n\n### 1. Gestione delle righe di ordine\n- **Se il documento (ordine di vendita o piano di produzione) esiste già:**  \n  Vengono cancellate tutte le righe inevase dell’ordine, ove possibile, e reinserite secondo il nuovo piano.  \n  Se non è possibile cancellare alcune righe (ad esempio, per errori), queste vengono evase forzatamente e sulla riga viene segnalato che non è stato possibile eliminarle [2][3][6].\n- **Righe parzialmente evase:**  \n  La quantità ancora aperta viene evasa forzatamente e, per la stessa quantità, viene creata una nuova riga con data di consegna uguale alla data di importazione [2][3].\n- **Distinzione tra righe di Ordine di Vendita (OV) e MPS:**  \n  La distinzione può avvenire tramite:\n  - Un numero di settimane impostato nel file di configurazione: le righe entro questo periodo sono OV, le altre MPS.\n  - Un elenco di codici riga specificati nel file: questi saranno OV, le altre MPS [9].\n- **Se il piano di produzione non esiste:**  \n  Viene creato un nuovo piano con le informazioni aggregate e la testata compilata secondo i dati del file [10].\n\n### 2. Data di importazione del piano\n- **Data del piano:**  \n  È sempre impostata uguale alla data di importazione [5].\n- **Data della commessa:**  \n  È impostata al 01/01/XXXX, dove XXXX è l’anno delle date di consegna richieste presenti nella commessa [8].\n\n### 3. Gestione errori e quantità in eccedenza\n- **Anteprima e warning/errori:**  \n  Prima dell’importazione, viene mostrata un’anteprima con eventuali messaggi di warning o errore (cliente/articolo mancante, documenti doppi, ecc.).  \n  Solo le testate senza warning o errori vengono importate [1][4].\n- **Errori durante la cancellazione delle righe:**  \n  Le righe vengono evase forzatamente e segnalate [2][3][6].\n- **Errori durante l’elaborazione del piano:**  \n  L’importazione viene annullata e ripristinata la situazione precedente [6].\n- **Quantità in eccedenza o in ritardo:**  \n  Se previsto dal tracciato, le quantità in eccedenza/ritardo vengono detratte/aggiunte alle righe dello stesso articolo fino al loro esaurimento [2][3].\n- **Log delle operazioni:**  \n  Un file di log giornaliero permette di tracciare tutte le attività svolte dal plugin [6].\n\n---\n\n### Riepilogo pratico\n1. Visualizzi in anteprima cosa verrà importato e ricevi eventuali errori/warning.\n2. Solo i documenti senza errori vengono importati.\n3. Le righe inevase vengono cancellate e reinserite, le parzialmente evase vengono chiuse e ricreate.\n4. La data delle nuove righe è quella di importazione.\n5. Quantità in eccesso/ritardo sono gestite secondo le regole del tracciato.\n\n---\n\n#### Documenti di riferimento:\n1. RI: [53744](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53744) - Documento 1, Chunk: 11, Autore: Sistema, Cliente: Test  \n2. RI: [37619](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=37619) - Documento 2, Chunk: 14, Autore: Sistema, Cliente: Test  \n3. RI: [53744](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53744) - Documento 3, Chunk: 14, Autore: Sistema, Cliente: Test  \n4. RI: [37619](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=37619) - Documento 4, Chunk: 12, Autore: Sistema, Cliente: Test  \n5. RI: [37619](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=37619) - Documento 5, Chunk: 2, Autore: Sistema, Cliente: Test  \n6. RI: [37619](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=37619) - Documento 6, Chunk: 20, Autore: Sistema, Cliente: Test  \n7. RI: [37619](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=37619) - Documento 9, Chunk: 10, Autore: Sistema, Cliente: Test  \n8. RI: [53744](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53744) - Documento 8, Chunk: 2, Autore: Sistema, Cliente: Test  \n9. RI: [37619](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=37619) - Documento 10, Chunk: 19, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q011",
+      "query_text": "Cosa fa la Tabsheet Documenti e come viene determinata la Data Disponibilita' al suo interno?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.5,
+        "precision_at_10": 0.1,
+        "recall_at_10": 0.5,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.5,
+        "avg_chunk_relevance_top10": 0.5,
+        "retrieval_time": 2.2090835571289062
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9469752648836094,
+        "generation_time": 3.718106985092163
+      },
+      "generated_answer": "La **Tabsheet Documenti** è una sezione che viene integrata per rispondere alle esigenze del magazzino, consentendo una visione riepilogativa dei documenti e delle relative informazioni di disponibilità. In particolare, nella prima griglia della tabsheet vengono visualizzate alcune colonne specifiche:\n\n- **Tipo Disponibilità**: viene compilata con la disponibilità più vincolante tra tutte le righe del documento.\n- **Data Disponibilità**: viene determinata come la data di disponibilità più vincolante tra tutte le righe del documento, ovvero quella più lontana nel tempo.\n- **Colorazione**: viene ereditata dalla riga più vincolante del documento, per una rapida individuazione visiva dello stato.\n\nIn sintesi, la **Data Disponibilità** riportata nella tabsheet Documenti corrisponde alla data più lontana tra tutte le righe del documento, rappresentando quindi il vincolo maggiore per la disponibilità complessiva del documento stesso [1].\n\nDocumenti di riferimento:\n1. RI: [39575](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=39575) - Documento 1, Chunk: 2, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q012",
+      "query_text": "Ciao, mi puoi dire come la revisione del plugin per l'importazione dei piani di consegna, menzionata nella relazione del 25/03/2025 per ELETTROSTAMPERIE POPPI S.P.A., si collega alle logiche di calcolo provvigionale gia' consolidate e descritte nella richiesta del 12/03/2025 per GMR ENLIGHTS S.R.L.? Vorrei capire se ci sono sovrapposizioni o se le modifiche del plugin impattano anche le logiche di calcolo provvigionale gia' implementate.",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.3333333333333333,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.3333333333333333,
+        "precision_at_10": 0.1,
+        "recall_at_10": 0.3333333333333333,
+        "avg_chunk_relevance_top3": 0.5,
+        "avg_chunk_relevance_top5": 0.3,
+        "avg_chunk_relevance_top10": 0.35,
+        "retrieval_time": 2.3971073627471924
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9537746228280627,
+        "generation_time": 10.554433345794678
+      },
+      "generated_answer": "La revisione del plugin per l’importazione dei piani di consegna, descritta nella relazione del 25/03/2025 per ELETTROSTAMPERIE POPPI S.P.A., introduce una serie di funzionalità specifiche per la gestione e il controllo delle importazioni, come la visualizzazione degli ultimi DDT, la gestione delle righe importabili/non importabili, estrazioni particolari sulle quantità e un confronto tra programmazioni correnti e precedenti [3]. Queste modifiche si focalizzano esclusivamente sul processo di importazione dei piani di consegna e sulla generazione degli Ordini di Vendita (OV) e dei Piani di Produzione (MPS) [1][10].\n\nDalla documentazione disponibile, non risultano riferimenti diretti o logiche condivise tra il plugin di importazione dei piani di consegna per ELETTROSTAMPERIE POPPI S.P.A. e le logiche di calcolo provvigionale descritte nella richiesta del 12/03/2025 per GMR ENLIGHTS S.R.L. (non presente nei documenti forniti). Le modifiche apportate al plugin per l’importazione dei piani di consegna riguardano esclusivamente la gestione dei dati di consegna, la loro importazione e la produzione di documentazione collegata, senza menzionare o coinvolgere le logiche di calcolo delle provvigioni.\n\n**Sovrapposizioni e impatti sulle logiche di calcolo provvigionale:**\n- Non emergono sovrapposizioni funzionali tra la revisione del plugin di importazione piani di consegna e le logiche di calcolo provvigionale già consolidate.\n- Le modifiche descritte per ELETTROSTAMPERIE POPPI S.P.A. non impattano, secondo i documenti forniti, le logiche di calcolo provvigionale già implementate per altri clienti o contesti.\n\n**Nota:** Se nelle logiche di calcolo provvigionale di GMR ENLIGHTS S.R.L. sono previsti collegamenti diretti con i dati generati dai piani di consegna importati (ad esempio, utilizzo di dati di OV/MPS generati dal plugin), questi aspetti non sono documentati nei materiali forniti. Pertanto, non è possibile confermare eventuali impatti senza ulteriori dettagli specifici sulla RI relativa a GMR ENLIGHTS S.R.L.\n\n### Sintesi\n- La revisione del plugin per l’importazione piani di consegna è una personalizzazione specifica di ELETTROSTAMPERIE POPPI S.P.A. e non modifica le logiche di calcolo provvigionale standard o personalizzate per altri clienti.\n- Non risultano sovrapposizioni o impatti sulle logiche di calcolo provvigionale già implementate, secondo i documenti disponibili.\n\n---\n\n**Documenti di riferimento:**\n1. RI: [53744](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53744) - Plug-in Generico per l'Importazione di Piani di Consegna, Chunk: 0, Autore: Sistema, Cliente: ELETTROSTAMPERIE POPPI S.P.A.\n3. RI: [54614](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54614) - Revisione Plugin Importazione Piani di Consegna // utilità comuni a tutte le importazioni, Chunk: 1, Autore: Sistema, Cliente: ELETTROSTAMPERIE POPPI S.P.A.\n10. RI: [53744](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53744) - Piani di produzione (MPS) e aggiunta nuovi campi, Chunk: 19, Autore: Sistema, Cliente: ELETTROSTAMPERIE POPPI S.P.A.\n\n> Nota: Non sono disponibili documenti sulla richiesta del 12/03/2025 per GMR ENLIGHTS S.R.L., pertanto non è possibile verificare dettagli sulle logiche di calcolo provvigionale implementate per quel cliente.",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q013",
+      "query_text": "Qual e' la funzione del parametro CARTELLA_INPUT nella configurazione EDI?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.0,
+        "recall_at_5": 0.0,
+        "precision_at_10": 0.0,
+        "recall_at_10": 0.0,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 1.0,
+        "avg_chunk_relevance_top10": 0.65,
+        "retrieval_time": 2.822464942932129
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9078498019253323,
+        "generation_time": 5.380754709243774
+      },
+      "generated_answer": "Il parametro **CARTELLA_INPUT** nella configurazione EDI di **SAM ERP2** indica la cartella in cui il sistema andrà a cercare i file da importare. Dopo che l’operatore seleziona una delle configurazioni abilitate nella finestra di gestione, il sistema importa tutti i file presenti nella cartella specificata dal parametro **CARTELLA_INPUT** che rispettano le condizioni definite dal parametro **FILTRO_FILE** (ad esempio, tutti i file con estensione `.txt`) [1][2][3][4][5][6].\n\nDocumenti di riferimento:\n1. RI: [45687](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45687) - Documento 1, Chunk: 17, Autore: Sistema, Cliente: Test\n2. RI: [55749](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55749) - Documento 2, Chunk: 6, Autore: Sistema, Cliente: Test\n3. RI: [53513](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53513) - Documento 3, Chunk: 6, Autore: Sistema, Cliente: Test\n4. RI: [53512](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53512) - Documento 4, Chunk: 6, Autore: Sistema, Cliente: Test\n5. RI: [53411](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53411) - Documento 5, Chunk: 6, Autore: Sistema, Cliente: Test\n6. RI: [52795](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=52795) - Documento 6, Chunk: 6, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q014",
+      "query_text": "Come si usa il classificatore generico 1 per separare ddt fresco/secco coi Classificatori Generici?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 1.0,
+        "precision_at_5": 0.4,
+        "recall_at_5": 1.0,
+        "precision_at_10": 0.2,
+        "recall_at_10": 1.0,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.6,
+        "avg_chunk_relevance_top10": 0.4,
+        "retrieval_time": 2.208369493484497
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9087445955919118,
+        "generation_time": 10.343239068984985
+      },
+      "generated_answer": "Per separare i DDT Fresco/Secco utilizzando il **Classificatore Generico 1** in SAM ERP2, viene adottata una logica personalizzata sviluppata tramite plugin su richiesta specifica del cliente ENTROTERRA S.p.A. Di seguito i passaggi e la logica implementata:\n\n### Funzionamento della suddivisione DDT Fresco/Secco\n\n1. **Identificazione della tipologia articolo**\n   - La tipologia dell’articolo (Fresco o Secco) è identificata tramite il valore impostato nel **Classificatore Generico 1** sull’anagrafica articolo [1].\n\n2. **Attivazione della logica per cliente**\n   - Sull’anagrafica cliente è stato aggiunto un campo personalizzato che permette di attivare la logica di suddivisione DDT solo per i clienti desiderati [4].\n\n3. **Modalità operativa**\n   - Durante la generazione dei DDT dalla gestione giri di consegna, se un ordine contiene sia articoli freschi che secchi:\n     - Se il pagamento è in contrassegno, viene generato un unico DDT.\n     - Se il pagamento è diverso dal contrassegno, vengono generati DDT separati per tipologia articolo (Fresco/Secco), riconosciuti tramite il **Classificatore Generico 1** [1].\n\n4. **Creazione e gestione dei tipi documento**\n   - Sono stati creati due tipi documento DDT:\n     - DDT di vendita Fresco (con prefisso F)\n     - DDT di vendita Secco (con prefisso S)\n   - Il plugin legge gli ID dei tipi documento da un file di configurazione (.ini) già utilizzato nella gestione dei giri di trasporto [4].\n\n5. **Stampa e packing list**\n   - È prevista una stampa personalizzata per i vettori che mostra la suddivisione (Fresco/Secco) dei DDT creati. La generazione automatica del packing list riepilogativo potrà essere oggetto di ulteriori richieste di implementazione [4][9].\n\n### Come usare il Classificatore Generico 1 nella selezione articoli\n- Quando si gestiscono ordini o si elaborano liste articoli, è possibile filtrare e selezionare gli articoli in base al **Classificatore Generico 1** tramite apposite finestre di selezione (TF2) e filtri, così da estrarre ed elaborare separatamente articoli freschi e secchi [3][5].\n\n---\n\n**In sintesi:**  \nLa separazione DDT Fresco/Secco tramite il Classificatore Generico 1 è una funzionalità personalizzata, non standard, realizzata tramite plugin e configurazioni specifiche per la gestione dei giri di consegna. Consente di generare automaticamente DDT distinti in base alla tipologia articolo (Fresco/Secco) riconosciuta dal Classificatore Generico 1, secondo le regole definite sull’anagrafica cliente e sulla modalità di pagamento.\n\n---\n\n### Documenti di riferimento:\n1. RI: [55614](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55614) - Documento 1, Chunk: 1, Autore: Sistema, Cliente: Test  \n2. RI: [55614](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55614) - Documento 2, Chunk: 0, Autore: Sistema, Cliente: Test  \n3. RI: [53152](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53152) - Documento 3, Chunk: 6, Autore: Sistema, Cliente: Test  \n4. RI: [55614](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55614) - Documento 4, Chunk: 3, Autore: Sistema, Cliente: Test  \n5. RI: [53152](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53152) - Documento 5, Chunk: 5, Autore: Sistema, Cliente: Test  \n6. RI: [55614](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55614) - Documento 9, Chunk: 2, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q015",
+      "query_text": "Nei flussi finanziari di SAM vengono tracciati anche le previsioni su interessi passivi/attivi bancari?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.4,
+        "precision_at_5": 0.4,
+        "recall_at_5": 0.4,
+        "precision_at_10": 0.2,
+        "recall_at_10": 0.4,
+        "avg_chunk_relevance_top3": 0.5,
+        "avg_chunk_relevance_top5": 0.5,
+        "avg_chunk_relevance_top10": 0.5,
+        "retrieval_time": 2.138176918029785
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.8982740672492884,
+        "generation_time": 9.717401504516602
+      },
+      "generated_answer": "Nei flussi finanziari di **SAM ERP2**, la gestione delle previsioni su interessi passivi/attivi bancari non è una funzionalità standard completamente automatizzata, ma può essere implementata tramite specifiche personalizzazioni.\n\nDai documenti disponibili risulta che:\n- È stata richiesta e sviluppata una personalizzazione per esporre, nella previsione finanziaria, la previsione di liquidazione degli interessi passivi per ogni conto banca, sfruttando il calcolo già presente nella funzione “calcolo interessi e competenze c/c”. Il periodo di liquidazione è configurabile per ciascun conto banca, in base alle regole definite dalla banca stessa [1].\n- Un’ulteriore richiesta di implementazione prevede che la previsione finanziaria includa i movimenti di addebito interessi applicati dalle banche (ad esempio, per operazioni di anticipo fattura o ricevuta bancaria). L’inclusione di questi movimenti nella previsione è gestita tramite un apposito flag introdotto dal plugin/personalizzazione [2].\n- La soluzione realizzata prevede la creazione di una scrittura extracontabile (non più temporanea) che riporta il valore degli interessi debitori calcolati, con data di movimento e causale configurabili. Queste scritture vengono considerate nei tab “Globale” e “Totale liquidità” della previsione finanziaria, influenzando i totali visualizzati [3][4][5].\n\n**In sintesi:**  \nLa tracciatura delle previsioni su interessi passivi/attivi bancari nei flussi finanziari di SAM ERP2 non è nativa, ma può essere ottenuta tramite personalizzazioni specifiche richieste dal cliente. Se ti interessa questa funzionalità, verifica se è stata attivata nel tuo ambiente oppure valuta una richiesta di implementazione.\n\n---\n\nDocumenti di riferimento:\n1. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Calcolo interessi e competenze c/c su previsione finanziaria, Chunk: 0, Autore: Sistema, Cliente: Test\n2. RI: [53139](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53139) - Previsione finanziaria - aggiunta calcolo interessi passivi, Chunk: 0, Autore: Sistema, Cliente: Test\n3. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Calcolo interessi e competenze c/c su previsione finanziaria, Chunk: 4, Autore: Sistema, Cliente: Test\n4. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Calcolo interessi e competenze c/c su previsione finanziaria, Chunk: 7, Autore: Sistema, Cliente: Test\n5. RI: [53139](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53139) - Previsione finanziaria - aggiunta calcolo interessi passivi, Chunk: 0, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q016",
+      "query_text": "Come funziona la configurazione della periodicita' di liquidazione degli interessi nella previsione finanziaria e quali sono le diverse opzioni disponibili per personalizzare il calcolo in base alle regole specifiche di ciascuna banca?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.25,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.25,
+        "precision_at_10": 0.2,
+        "recall_at_10": 0.5,
+        "avg_chunk_relevance_top3": 0.8333333333333334,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.6,
+        "retrieval_time": 2.1878154277801514
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": null,
+        "generation_time": 14.054347515106201
+      },
+      "generated_answer": "La configurazione della **periodicità di liquidazione degli interessi** nella previsione finanziaria di SAM ERP2, secondo la personalizzazione richiesta, permette una gestione flessibile e dettagliata delle regole bancarie specifiche. Di seguito trovi una panoramica delle funzionalità e delle opzioni disponibili:\n\n### 1. Configurazione delle periodicità di liquidazione\n\nPer ogni conto banca, è possibile definire la periodicità di liquidazione degli interessi, scegliendo tra diverse opzioni standard e personalizzabili. Le principali periodicità gestite sono:\n\n- **Annuale**: Esempio, giorno di liquidazione 01/01, periodo di riferimento 01/01–31/12.\n- **Semestrale**: Esempio, giorni di liquidazione 01/01 e 01/07, con periodi di riferimento rispettivi (01/07–31/12 e 01/01–30/06).\n- **Quadrimestrale**: Esempio, giorni di liquidazione 01/01, 01/05, 01/09.\n- **Trimestrale**: Esempio, giorni di liquidazione 01/01, 01/04, 01/07, 01/10.\n- **Bimestrale**: Esempio, giorni di liquidazione 01/01, 01/03, 01/05, 01/07, 01/09, 01/11.\n- **Mensile**: Esempio, giorno di liquidazione 6 di ogni mese, con periodo di riferimento 1–31 del mese precedente.\n\nPer ogni periodicità, viene indicato:\n- **Giorno di liquidazione** (o giorni, se la periodicità lo prevede).\n- **Periodo di riferimento** per il calcolo degli interessi [1][3][10].\n\n### 2. Personalizzazione e flessibilità\n\n- La periodicità e i giorni di liquidazione sono **configurabili per ogni conto banca**: ogni banca può avere regole specifiche, facilmente impostabili tramite nuove tabelle o parametri di configurazione [3][10].\n- È possibile **simulare il calcolo degli interessi** tramite la funzione “calcolo interessi e competenze c/c”, che considera la configurazione impostata per ciascun conto [1][3].\n\n### 3. Opzioni avanzate e logica di calcolo\n\n- Il sistema consente di **adeguare la logica di calcolo** degli interessi futuri, ad esempio calcolando dalla data “odierna + 1” [5].\n- Si può **forzare una data di liquidazione fissa**: se presente, questa data ha priorità sulla periodicità configurata [7].\n- La scrittura extracontabile generata viene aggiornata finché il periodo di riferimento è attivo; al termine del periodo, viene creata una nuova scrittura [8].\n- È possibile gestire **periodi di margine** (es. 30 giorni) per considerare la ricezione di fatture o note di credito dopo la maturazione degli interessi [2][4].\n\n### 4. Gestione plugin e configurazione\n\n- Esiste un **plugin personalizzato** per la gestione degli interessi in previsione finanziaria, che può essere attivato/disattivato tramite file di configurazione [5].\n- I dati calcolati vengono esposti nella previsione finanziaria, con indicatori specifici (conto banca, periodicità, data inizio/fine, tipo registrazione) per facilitarne la consultazione [8].\n\n### Sintesi\nLa soluzione implementata permette di **personalizzare la periodicità di liquidazione degli interessi** per ciascun conto banca, simulare i calcoli secondo le regole specifiche di ogni istituto e gestire casi particolari (date fisse, margini temporali, aggiornamento scritture) attraverso un plugin dedicato e una configurazione dettagliata.\n\n---\n\n#### Documenti di riferimento:\n1. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 3, Chunk: 0, Autore: Sistema, Cliente: Test  \n2. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 1, Chunk: 3, Autore: Sistema, Cliente: Test  \n3. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 10, Chunk: 2, Autore: Sistema, Cliente: Test  \n4. RI: [54169](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54169) - Documento 2, Chunk: 2, Autore: Sistema, Cliente: Test  \n5. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 5, Chunk: 8, Autore: Sistema, Cliente: Test  \n6. RI: [54169](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54169) - Documento 7, Chunk: 4, Autore: Sistema, Cliente: Test  \n7. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 8, Chunk: 5, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q017",
+      "query_text": "Come viene gestita la sovrascrittura delle scritture extracontabili nel calcolo degli interessi durante un periodo attivo e cosa succede quando si passa al periodo successivo nella previsione finanziaria?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.3333333333333333,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.3333333333333333,
+        "precision_at_10": 0.1,
+        "recall_at_10": 0.3333333333333333,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.5,
+        "retrieval_time": 2.0579612255096436
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": null,
+        "generation_time": 10.509676218032837
+      },
+      "generated_answer": "La gestione della sovrascrittura delle scritture extracontabili nel calcolo degli interessi durante un periodo attivo e la transizione al periodo successivo nella previsione finanziaria in **SAM ERP2** (personalizzazione su richiesta ARCASA S.p.A.) avviene secondo questa logica:\n\n### Durante il periodo attivo\n- Viene creata una scrittura extracontabile temporanea per il periodo di liquidazione attualmente “attivo”. Ad esempio, se il periodo è 01/04/2025-30/06/2025 e la data odierna è nel range, la scrittura riguarda solo questo periodo [2].\n- La scrittura extracontabile viene **sovrascritta** ogni volta che viene rilanciata la previsione finanziaria all’interno dello stesso periodo attivo. Quindi, tutte le elaborazioni dal 01/04 al 30/06 sovrascrivono la scrittura datata 01/07/2025 [2].\n- Queste scritture sono identificate tramite indicatori come conto banca, periodicità, data inizio/fine, tipo registrazione, così da poterle recuperare facilmente [2][10].\n- La data del movimento di addebito deve coincidere con quella calcolata dalla periodicità e dalla data di liquidazione, e la causale è “fittizia” secondo configurazione [1][8].\n\n### Passaggio al periodo successivo\n- Quando si passa al periodo successivo (es. dal 01/07/2025 in poi), la previsione finanziaria crea una **nuova scrittura** per il nuovo periodo.\n- La scrittura del periodo precedente **non viene più sovrascritta**: resta come storicizzata, mentre tutte le sovrascritture avvengono solo sul periodo attivo [2].\n- Questo garantisce che le previsioni siano sempre aggiornate sull’attuale periodo e che i dati storici delle previsioni precedenti non vengano persi.\n\n### Ulteriori dettagli\n- Il valore degli interessi debitori calcolato viene riportato sul foglio “conteggio delle competenze” e utilizzato per la scrittura extracontabile [3].\n- In caso di scrittura extracontabile su periodo già passato, questa rimane a carico dell’utente, mentre i periodi futuri non vengono considerati [2].\n- Se esiste una data di liquidazione fissa, questa ha priorità sulla periodicità [8].\n\n---\n\n## Documenti di riferimento:\n1. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 1, Chunk: 7, Autore: Sistema, Cliente: Test  \n2. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 2, Chunk: 5, Autore: Sistema, Cliente: Test  \n3. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 3, Chunk: 4, Autore: Sistema, Cliente: Test  \n4. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 10, Chunk: 6, Autore: Sistema, Cliente: Test  \n5. RI: [54169](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54169) - Documento 8, Chunk: 4, Autore: Sistema, Cliente: Test  \n\n**Nota:** Tutte le logiche descritte derivano da una personalizzazione specifica per il cliente ARCASA S.p.A. e non sono parte della funzione standard di SAM ERP2.",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q018",
+      "query_text": "Quali sono i parametri configurabili e le caratteristiche della scrittura extracontabile che viene creata per il calcolo degli interessi passivi nella previsione finanziaria?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.5,
+        "precision_at_5": 0.4,
+        "recall_at_5": 1.0,
+        "precision_at_10": 0.2,
+        "recall_at_10": 1.0,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.6,
+        "avg_chunk_relevance_top10": 0.5,
+        "retrieval_time": 2.5241973400115967
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9150977667324887,
+        "generation_time": 14.219877004623413
+      },
+      "generated_answer": "Per la scrittura extracontabile creata per il calcolo degli interessi passivi nella previsione finanziaria, sono configurabili e caratterizzabili i seguenti parametri e aspetti (personalizzazione/plugin su richiesta cliente):\n\n### Parametri configurabili\n\n- **Data del movimento di addebito interessi:**  \n  Viene impostata in base alla periodicità e alla data di liquidazione. Se esiste una “data liquidazione” fissa (es. su APRIG), questa ha priorità sulla periodicità di liquidazione e la scrittura sarà posizionata su tale data [8].\n\n- **Causale:**  \n  È una causale “fittizia” definita in un file di configurazione [.ini], specifica per questa funzione [7].\n\n- **Conto della scrittura:**  \n  Utilizza il conto banca di riferimento, che deve essere sempre di tipo “conto corrente” (inclusi conti anticipi, salvo buon fine, ecc.) [7].\n\n- **Contropartita:**  \n  Deve essere configurabile tramite file .ini e, tipicamente, è un conto “interessi passivi” [7].\n\n- **Indicatori aggiuntivi su MOVCON:**  \n  Per recuperare facilmente la scrittura, sono consigliati i seguenti indicatori:  \n  - CONTO BANCA (come indicato nel calcolo competenze e interessi c/c)\n  - PERIODICITÀ (da nuova tabella configurabile)\n  - DATA INIZIO e FINE del periodo [4]\n\n- **Sovrascrittura e gestione temporale:**  \n  La scrittura viene sovrascritta durante il periodo attivo (es. trimestre in corso); al termine del periodo, la nuova scrittura viene creata senza sovrascrivere la precedente [4].\n\n- **Gestione plugin:**  \n  È possibile, tramite file di configurazione, disabilitare il vecchio plugin di calcolo interessi passivi in previsione finanziaria [3].\n\n### Caratteristiche della scrittura extracontabile\n\n- **Finalità:**  \n  La scrittura viene creata per permettere il corretto calcolo e visualizzazione degli interessi passivi nella previsione finanziaria, sfruttando i dati già calcolati dalla funzione standard “calcolo interessi e competenze c/c” [5].\n\n- **Durata:**  \n  Inizialmente prevista come temporanea, la scrittura ora non deve più essere eliminata dopo l’elaborazione della previsione finanziaria [2].\n\n- **Ricalcolo dei totali:**  \n  L’inserimento della scrittura extracontabile deve portare al ricalcolo dei totali nei tabsheet “Globale” e “Totale liquidità” [7].\n\n- **Personalizzazione per banca:**  \n  Ogni conto banca può avere regole di liquidazione configurabili, con periodicità impostabile per ciascun conto [5].\n\n- **Ambito di applicazione:**  \n  La soluzione è stata richiesta per includere nella previsione finanziaria anche i movimenti di addebito interessi relativi ad anticipi fatture o ricevute bancarie, attivabili tramite apposito flag nel menu di lancio (funzionalità personalizzata) [6].\n\n### Sintesi operativa\n- La scrittura extracontabile viene generata solo per il periodo attivo alla data di elaborazione (es. trimestre corrente).\n- Viene aggiornata/sovrascritta fino al termine del periodo, poi archiviata.\n- Parametri chiave (causale, contropartita, periodicità, conto banca) sono configurabili tramite file di configurazione.\n- L’inclusione nella previsione finanziaria e la gestione delle scritture sono state oggetto di specifiche richieste di implementazione (non standard).\n\n---\n\nDocumenti di riferimento:\n1. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 1, Chunk: 7, Autore: Sistema, Cliente: Test  \n2. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 2, Chunk: 4, Autore: Sistema, Cliente: Test  \n3. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 3, Chunk: 8, Autore: Sistema, Cliente: Test  \n4. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 4, Chunk: 5, Autore: Sistema, Cliente: Test  \n5. RI: [54363](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54363) - Documento 5, Chunk: 0, Autore: Sistema, Cliente: Test  \n6. RI: [53139](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53139) - Documento 6, Chunk: 0, Autore: Sistema, Cliente: Test  \n7. RI: [54169](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54169) - Documento 8, Chunk: 4, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q019",
+      "query_text": "Come viene determinato il conto dare e il conto avere durante l'importazione del file Airplus e come cambia la logica in caso di importo negativo?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.0,
+        "recall_at_5": 0.0,
+        "precision_at_10": 0.0,
+        "recall_at_10": 0.0,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 0.9,
+        "avg_chunk_relevance_top10": 0.7,
+        "retrieval_time": 2.451209306716919
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9293952062609779,
+        "generation_time": 8.475323677062988
+      },
+      "generated_answer": "La determinazione del **conto dare** e del **conto avere** durante l’importazione del file Airplus in SAM ERP2 segue una logica basata sia sulle configurazioni che sul segno dell’importo:\n\n### Logica standard di importazione\n- **Conto Dare**: viene recuperato dalla tabella di trascodifica conti.  \n- **Conto Avere**: viene recuperato dal file di configurazione.\n\nPer ogni riga del file CSV importato, viene creato un record nella tabella delle righe con questa impostazione di default [1][2]:\n\n| Importo (Gross Amount) | Conto Dare                     | Conto Avere                  |\n|------------------------|-------------------------------|------------------------------|\n| Positivo               | Da tabella di trascodifica     | Da file di configurazione    |\n| Negativo (storno)      | Da file di configurazione      | Da tabella di trascodifica   |\n\n### Gestione importi negativi (storni)\nQuando l’importo (Gross Amount) è **negativo**:\n- Il conto che normalmente sarebbe in “Dare” viene utilizzato come “Avere”.\n- Il conto che normalmente sarebbe in “Avere” viene utilizzato come “Dare”.\n\nQuesta inversione avviene automaticamente in fase di importazione. Tuttavia, nei casi di storno, se necessario, il conto avere può essere modificato manualmente dall’amministratore durante il caricamento su SAM, a meno che non sia stato implementato un automatismo specifico per l’associazione dei conti in caso di storno [3][4].\n\n### Ulteriori personalizzazioni e controllo manuale\n- In presenza di rimborsi o casi particolari, sarà cura dell’utente gestire manualmente la corretta attribuzione di conto dare e conto avere nell’area di dettaglio, con la possibilità di modificare i dati delle righe prima dell’importazione definitiva [5][6].\n- È previsto anche un flag “Segno Dare/Avere” che può essere utilizzato per il calcolo del totale e per facilitare la correzione manuale [5].\n\n### Sintesi operativa\n1. L’utente seleziona la causale contabile e il file da importare.\n2. Il sistema crea le righe con conto dare/avere secondo la logica sopra.\n3. In caso di importi negativi, la logica dei conti viene invertita.\n4. L’utente può integrare/modificare le informazioni mancanti o non corrette prima di completare l’importazione.\n\n---\n\n**Documenti di riferimento:**\n\n1. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 1, Chunk: 4, Autore: Sistema, Cliente: Test  \n2. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 2, Chunk: 4, Autore: Sistema, Cliente: Test  \n3. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 3, Chunk: 0, Autore: Sistema, Cliente: Test  \n4. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 4, Chunk: 0, Autore: Sistema, Cliente: Test  \n5. RI: [54576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54576) - Documento 6, Chunk: 9, Autore: Sistema, Cliente: Test  \n6. RI: [54576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54576) - Documento 10, Chunk: 10, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q020",
+      "query_text": "Come vengono popolati i campi RIFERI1, RIFERI2 e RIFERI3 durante l'importazione delle righe del file CSV Airplus?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.0,
+        "recall_at_5": 0.0,
+        "precision_at_10": 0.0,
+        "recall_at_10": 0.0,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 1.0,
+        "avg_chunk_relevance_top10": 0.8,
+        "retrieval_time": 2.430819034576416
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9375839927257359,
+        "generation_time": 7.301446199417114
+      },
+      "generated_answer": "Durante l’importazione delle righe dal file CSV Airplus tramite il plugin sviluppato appositamente, i campi **RIFERI1**, **RIFERI2** e **RIFERI3** vengono popolati come segue:\n\n- **RIFERI1**: viene recuperato dalla tabella di trascodifica dei tipi servizio. Viene utilizzato l’operatore SQL “LIKE” per trovare la corrispondenza tra i primi caratteri della stringa presente nella colonna “Service Type” del file importato e la gestione di codifica configurata [1][2][3][4].\n- **RIFERI2**: viene valorizzato con il nome del passeggero, corrispondente alla colonna “Traveller” del file CSV Airplus [1][2][3][4]. È prevista una casella di testo (max 40 caratteri) per eventuali modifiche manuali [5][6].\n- **RIFERI3**: viene compilato con il valore del campo “IDCOMRIG” presente nel file [1][2][3][4].\n\nIn caso di mancata compilazione automatica di uno di questi campi, l’operatore contabile può intervenire manualmente sulla riga tramite appositi menu a tendina (per RIFERI1 e RIFERI3) o casella di testo (per RIFERI2) per correggere o integrare i valori [5][6].\n\n> **Nota:** Questa modalità di importazione e gestione dei campi è parte di un plugin sviluppato su specifica richiesta e non è una funzionalità standard di SAM ERP2 [3][4].\n\n---\n\n### Documenti di riferimento:\n1. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 1, Chunk: 5, Autore: Sistema, Cliente: Test\n2. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 2, Chunk: 5, Autore: Sistema, Cliente: Test\n3. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 3, Chunk: 1, Autore: Sistema, Cliente: Test\n4. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 4, Chunk: 1, Autore: Sistema, Cliente: Test\n5. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 5, Chunk: 16, Autore: Sistema, Cliente: Test\n6. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 6, Chunk: 16, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q021",
+      "query_text": "In che modo viene gestita la contabilita' divisionale durante l'importazione AIRPLUS e quale ruolo ha la funzione SQL dedicata?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.0,
+        "recall_at_5": 0.0,
+        "precision_at_10": 0.0,
+        "recall_at_10": 0.0,
+        "avg_chunk_relevance_top3": 0.5,
+        "avg_chunk_relevance_top5": 0.5,
+        "avg_chunk_relevance_top10": 0.5,
+        "retrieval_time": 2.2827513217926025
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.8451293069445145,
+        "generation_time": 12.046332597732544
+      },
+      "generated_answer": "La gestione della **contabilità divisionale** durante l’importazione AIRPLUS in SAM ERP2 avviene tramite un plug-in sviluppato appositamente, che introduce nuove funzionalità e tabelle dedicate per assicurare la corretta registrazione e suddivisione dei dati contabili provenienti dai file AIRPLUS.\n\n### Gestione della contabilità divisionale\n\n- **Colonna “Department” del file AIRPLUS**: viene utilizzata come identificativo del numero della commessa e popola anche il campo di contabilità analitica, consentendo così di associare ogni movimento importato alla relativa divisione aziendale. Se la regola di associazione non può essere applicata automaticamente, un amministratore può modificare manualmente il file prima dell’importazione [1][2].\n- **Tabella delle righe (EXT_AIRPLUS_RIG)**: ogni riga importata dal file AIRPLUS genera un record in questa tabella, che contiene anche il campo `iddivisione`. Questo campo permette di tracciare e gestire la divisione associata a ciascuna registrazione contabile [6][7].\n\n### Funzione SQL dedicata\n\n- **Ruolo della funzione SQL**: la funzione SQL sviluppata nell’ambito della personalizzazione si occupa di:\n    - Leggere le informazioni dal file AIRPLUS (in particolare la colonna “Department”).\n    - Popolare le tabelle di dettaglio (`EXT_AIRPLUS_RIG`), associando a ciascuna riga i riferimenti divisione (`iddivisione`) e centro di costo (`idrepcdc`).\n    - Applicare le logiche di associazione tra stringhe del file e conti contabili tramite la tabella di trascodifica (`EXT_AIRPLUS_CONTI`), che permette di mappare dinamicamente le tipologie di costo ai conti corretti [3][8][9].\n    - Gestire la creazione delle testate di registrazione e delle relative righe, integrando eventuali informazioni mancanti e permettendo all’utente di completarle manualmente [8][9].\n\n### Operatività\n\n- L’utente può avviare una nuova importazione tramite l’apposita voce di menu, selezionare il file csv e confermare i dati.\n- Ogni registrazione viene suddivisa per divisione secondo la logica descritta sopra, garantendo una tracciabilità completa delle movimentazioni per divisione e centro di costo.\n- Le registrazioni possono essere filtrate e visualizzate in base allo stato (“Contabilizzate” o “Non contabilizzate”), data, divisione e altri parametri [4][5][6][7].\n\n> **Nota:** Tutte queste funzionalità sono state realizzate tramite un plug-in personalizzato, non fanno parte delle funzioni standard di SAM ERP2, ma sono state oggetto di specifica richiesta di implementazione [1][2][3][8][9].\n\n---\n\n#### Documenti di riferimento:\n1. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 1, Chunk: 1, Autore: Sistema, Cliente: Test\n2. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 2, Chunk: 1, Autore: Sistema, Cliente: Test\n3. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 3, Chunk: 8, Autore: Sistema, Cliente: Test\n4. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 4, Chunk: 3, Autore: Sistema, Cliente: Test\n5. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 5, Chunk: 3, Autore: Sistema, Cliente: Test\n6. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 6, Chunk: 10, Autore: Sistema, Cliente: Test\n7. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 7, Chunk: 10, Autore: Sistema, Cliente: Test\n8. RI: [55309](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55309) - Documento 8, Chunk: 11, Autore: Sistema, Cliente: Test\n9. RI: [55325](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=55325) - Documento 9, Chunk: 11, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q022",
+      "query_text": "Esiste un modo di precompilare le righe di intervento in base al numero di dipendenti e di giorni, seguendo uno schema base configurabile? Ad esempio, se configurassimo 5 campi fissi nello schema base, quante righe di intervento precompilato si dovrebbero generare per 3 dipendenti con 3 giorni di interventi?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.4,
+        "precision_at_5": 0.4,
+        "recall_at_5": 0.4,
+        "precision_at_10": 0.2,
+        "recall_at_10": 0.4,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.5,
+        "avg_chunk_relevance_top10": 0.5,
+        "retrieval_time": 3.322084903717041
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9254853979228487,
+        "generation_time": 6.389542818069458
+      },
+      "generated_answer": "In base ai documenti forniti, la generazione automatica delle righe di intervento in funzione del numero di dipendenti e giorni, secondo uno schema base configurabile, non è una funzionalità standard di SAM ERP2 ma è oggetto di specifiche personalizzazioni richieste da alcuni clienti.\n\n### Funzionamento della personalizzazione\n\n- Attualmente, per ogni tecnico e per ogni giorno di intervento, vengono generate un numero fisso di righe attività (es. 7 righe ATTINT), parametrizzate tramite PI o da configurazione [1].\n- Esempio pratico: se hai 1 tecnico per 3 giorni, il sistema genera 7 x 3 = **21 righe** di attività precompilate. Se hai 2 tecnici per 3 giorni, si generano 7 x 3 x 2 = **42 righe** [1][2].\n- Il numero di righe precompilate quindi si calcola come:  \n  **Numero Dipendenti x Numero Giorni x Numero Campi Fissi nello schema base**.\n\n#### Applicazione all’esempio richiesto\nSe lo schema base prevede 5 campi fissi, per 3 dipendenti e 3 giorni:\n- **3 dipendenti x 3 giorni x 5 campi fissi = 45 righe di intervento precompilate**.\n\n### Dettagli implementativi\n- La domanda su “quanti giorni/quanti tecnici” viene proposta all’utente in fase di creazione intervento (personalizzazione) [2].\n- L’inserimento massivo delle righe attività è gestito tramite funzioni personalizzate e non standard [3][4].\n- I parametri delle attività (articoli, attività, ecc.) sono definiti tramite file di configurazione o tabelle dedicate [3].\n\n> **Nota:** Questa logica di precompilazione e moltiplicazione delle righe attività è realizzata tramite plugin/personalizzazioni sviluppate su richiesta, non fa parte delle funzionalità native standard di SAM ERP2.\n\n---\n\n#### Documenti di riferimento:\n1. RI: [53110](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53110) - Documento 1, Chunk: 1, Autore: Sistema, Cliente: Test\n2. RI: [53110](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53110) - Documento 2, Chunk: 2, Autore: Sistema, Cliente: Test\n3. RI: [54303](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54303) - Documento 3, Chunk: 7, Autore: Sistema, Cliente: Test\n4. RI: [54303](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54303) - Documento 4, Chunk: 2, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q023",
+      "query_text": "Esiste un modo per gestire i trasferimenti interni su magazzini mobili tramite portale CRM2?",
+      "retrieval_metrics": {
+        "precision_at_3": 1.0,
+        "recall_at_3": 0.75,
+        "precision_at_5": 0.8,
+        "recall_at_5": 1.0,
+        "precision_at_10": 0.4,
+        "recall_at_10": 1.0,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 0.8,
+        "avg_chunk_relevance_top10": 0.65,
+        "retrieval_time": 2.1799240112304688
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.924434762118566,
+        "generation_time": 7.663261413574219
+      },
+      "generated_answer": "Per la gestione dei trasferimenti interni su magazzini mobili tramite il portale **CRM2** in SAM ERP2, esiste una soluzione sviluppata su richiesta specifica (personalizzazione) che consente ai tecnici, codificati anche come agenti e associati a magazzini mobili, di effettuare trasferimenti tra di loro utilizzando una funzione dedicata nel portale.\n\n### Modalità di funzionamento (personalizzazione RI 45674):\n\n- **Tecnici come agenti**: Ogni tecnico deve essere censito come agente e collegato ad un magazzino mobile.\n- **Tipo documento specifico**: Tramite uno specifico tipo documento (configurabile tramite chiave Web.Config), il tecnico può avviare la procedura di trasferimento interno.\n- **Causale di scarico non modificabile**: La causale di scarico per il trasferimento interno è preimpostata e non modificabile.\n- **Selezione del destinatario**: In fase di scarico, il tecnico seleziona il collega destinatario (anch'esso agente con magazzino mobile).\n- **Gestione articoli**: Il tecnico compila le righe degli articoli da trasferire, anche verso diversi colleghi.\n- **Scarico articoli**: Attraverso la funzione standard di scarico articoli/intervento, per ogni riga viene proposta la selezione del magazzino di destinazione.\n- **Visualizzazione**: Dopo lo scarico, il magazzino di destinazione viene visualizzato nell’elenco articoli.\n- **Personalizzazione Webservice**: Il sistema imposta automaticamente i campi di partenza e arrivo dei magazzini tramite una chiamata webservice personalizzata.\n- **Disabilitazione attività**: Per questo tipo documento non vengono generate attività e la possibilità di crearle viene disabilitata.\n\nQuesta modalità è stata implementata come **personalizzazione per specifiche esigenze del cliente** e non fa parte delle funzionalità standard del prodotto [1][2][3][4].\n\n---\n\n### Sintesi\nLa gestione dei trasferimenti interni su magazzini mobili tramite portale CRM2 è possibile, ma solo tramite una **personalizzazione** realizzata su richiesta (RI 45674). Non si tratta di una funzione standard di SAM ERP2, ma di un flusso customizzato che prevede una causale specifica, selezione del tecnico destinatario, e la gestione tramite tipo documento dedicato e webservice personalizzati.\n\n---\n\n#### Documenti di riferimento:\n1. RI: [45674](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45674) - Documento 1, Chunk: 0, Autore: Sistema, Cliente: Test  \n2. RI: [45674](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45674) - Documento 2, Chunk: 2, Autore: Sistema, Cliente: Test  \n3. RI: [45674](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45674) - Documento 3, Chunk: 1, Autore: Sistema, Cliente: Test  \n4. RI: [45674](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45674) - Documento 4, Chunk: 3, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q024",
+      "query_text": "Quali sono i punti di attivazione della personalizzazione per la generazione automatica delle righe di intervento in SAM e come differisce il comportamento tra SAM e POW?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.6666666666666666,
+        "precision_at_5": 0.6,
+        "recall_at_5": 1.0,
+        "precision_at_10": 0.3,
+        "recall_at_10": 1.0,
+        "avg_chunk_relevance_top3": 1.0,
+        "avg_chunk_relevance_top5": 0.9,
+        "avg_chunk_relevance_top10": 0.65,
+        "retrieval_time": 2.276238441467285
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9245518413650465,
+        "generation_time": 10.098187685012817
+      },
+      "generated_answer": "Per la generazione automatica delle righe di intervento in **SAM ERP2**, sono stati identificati specifici punti di attivazione nell’ambito di una personalizzazione richiesta dal cliente. Di seguito la sintesi dei punti di attivazione e le differenze di comportamento tra SAM e POW:\n\n---\n\n### Punti di attivazione della personalizzazione in SAM\n\n- **Scheda Servizio**\n- **Griglia Scheda Intervento**\n- **RMA \"Standard\"**\n\nDa questi punti, la generazione dell’intervento segue la procedura standard (STD), con l’aggiunta della personalizzazione che prevede:\n- Intercettazione di tutti i punti di attivazione sopra elencati.\n- All’attivazione, viene proposta una domanda all’operatore per indicare il **numero di giorni** e il **numero di tecnici**. Se entrambi i valori sono diversi da zero, la procedura genera un numero di attività (ATTINT) pari al prodotto dei giorni per i tecnici, secondo le parametrizzazioni definite.\n- Gli articoli/attività da replicare sono definiti tramite una sezione di “Programmi Speciali” (MenuSpe), che permette di parametrizzare la “giornata tipo” del tecnico.\n- È possibile prevedere un campo su servizi o su OV per RMA, che consente di bypassare la domanda attingendo direttamente dal valore impostato nel campo [3][4][9].\n\n---\n\n### Punti di attivazione e comportamento in POW\n\n- Attualmente, il punto di attivazione principale è la **pagina delle attività del POW**.\n- Viene creato un **nuovo tasto** dedicato che, a differenza della modalità standard, inserisce direttamente l’intero set di record parametrizzati dal MenuSpe.\n- In POW, la generazione delle righe avviene per singola giornata (es. 7 righe preimpostate per una giornata tipo), e ogni tecnico prolunga la propria permanenza presso il cliente giorno per giorno, se necessario [1][2][4].\n\n---\n\n### Differenze tra SAM e POW\n\n- **SAM**: La domanda sul numero di giorni e tecnici viene sempre proposta all’utente in fase di generazione intervento. Il sistema genera tutte le righe di attività parametrizzate, moltiplicate per giorni e tecnici. La creazione degli interventi può avvenire in più punti (servizi, griglia interventi, RMA).\n- **POW**: Non viene chiesta la domanda sul numero di giorni/tecnici. L’operatore utilizza un nuovo tasto che inserisce le righe parametrizzate per una singola giornata. L’eventuale estensione della permanenza tecnica viene gestita giorno per giorno all’interno di POW [1][2][3][4].\n\n---\n\n### Sintesi operativa\n\n- In **SAM**: Intercettare tutti i punti di attivazione (Servizi, Griglia Interventi, RMA), proporre domanda su giorni e tecnici, generare righe secondo parametrizzazione.\n- In **POW**: Utilizzare il nuovo tasto in “Attività”, che genera le righe parametrizzate per una giornata, senza domande aggiuntive.\n\n---\n\n## Documenti di riferimento\n\n1. RI: [53110](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53110) - Documento 1, Chunk: 4, Autore: Sistema, Cliente: Test\n2. RI: [53110](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53110) - Documento 2, Chunk: 3, Autore: Sistema, Cliente: Test\n3. RI: [53110](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53110) - Documento 3, Chunk: 6, Autore: Sistema, Cliente: Test\n4. RI: [53110](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53110) - Documento 4, Chunk: 2, Autore: Sistema, Cliente: Test\n5. RI: [53110](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53110) - Documento 9, Chunk: 1, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q025",
+      "query_text": "Quali sono le caratteristiche specifiche degli interventi generati per trasferimenti interni e quali limitazioni hanno rispetto agli interventi standard?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.3333333333333333,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.3333333333333333,
+        "precision_at_10": 0.1,
+        "recall_at_10": 0.3333333333333333,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.6,
+        "avg_chunk_relevance_top10": 0.55,
+        "retrieval_time": 2.264047622680664
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9204740611000352,
+        "generation_time": 9.711661338806152
+      },
+      "generated_answer": "Le caratteristiche specifiche degli **interventi generati per trasferimenti interni** rispetto agli interventi standard in SAM ERP2, secondo la documentazione fornita, sono le seguenti:\n\n### Caratteristiche specifiche degli interventi per trasferimenti interni\n\n- **Tipo documento dedicato**: Gli interventi per trasferimenti interni sono identificati tramite uno specifico \"Tipo documento\" che viene impostato da una chiave di configurazione (es. Web.Config) [3].\n- **Assenza di attività precompilate**: Quando un intervento nasce per un trasferimento interno (da POW), viene generato senza righe di attività associate (\"attività\") e l’aggiunta di attività viene disabilitata. Questo limita la possibilità di inserire attività come avviene negli interventi standard [2].\n- **Compilazione tecnica delle righe articoli**: Solo il tecnico incaricato può compilare le righe degli articoli da trasferire ai colleghi, permettendo così la gestione dettagliata delle quantità e dei destinatari [2][3].\n- **Gestione causale di scarico**: La causale di scarico utilizzata per il trasferimento interno è preimpostata e non modificabile dall’utente. Questo garantisce uniformità e controllo sulla tracciabilità dei movimenti [2].\n- **Scarico articoli e chiusura intervento**: Alla chiusura dell’intervento, per ogni riga articolo viene proposta la movimentazione di magazzino secondo la causale di trasferimento interno [2].\n\n### Limitazioni rispetto agli interventi standard\n\n- **Impossibilità di aggiungere attività**: A differenza degli interventi standard (dove possono essere precompilate o aggiunte più righe di attività in base a tecnici e giorni, come da parametrizzazione PI [1]), negli interventi per trasferimenti interni questa funzionalità è disabilitata [2].\n- **Causale non modificabile**: La causale di scarico è fissa e non può essere cambiata dall’utente, mentre negli interventi standard la causale può essere selezionata o modificata in base alle esigenze operative [2].\n- **Utilizzo specifico per trasferimenti tra tecnici**: Gli interventi per trasferimenti interni sono pensati esclusivamente per la movimentazione di articoli tra tecnici (magazzini mobili), e non per la gestione di attività operative, manutenzioni o servizi come nei casi standard [3].\n- **Personalizzazione necessaria**: Tutte le logiche descritte (esclusione attività, gestione causale fissa, comportamento differenziato per tipo documento) sono implementate tramite personalizzazione specifica e non fanno parte della funzionalità standard del modulo interventi [2][3].\n\n---\n\n### Sintesi\n\nGli interventi per trasferimenti interni sono caratterizzati da:\n- assenza di attività,\n- gestione vincolata delle causali di scarico,\n- compilazione delle righe articoli riservata al tecnico incaricato,\n- possibilità di trasferire articoli tra magazzini mobili dei tecnici.\n\nQueste caratteristiche e limitazioni sono state implementate tramite personalizzazione su richiesta cliente, e non sono disponibili nella versione standard di SAM ERP2.\n\n---\n\n#### Documenti di riferimento:\n1. RI: [53110](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53110) - Documento 1, Chunk: 1, Autore: Sistema, Cliente: Test\n2. RI: [45674](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45674) - Documento 2, Chunk: 1, Autore: Sistema, Cliente: Test\n3. RI: [45674](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=45674) - Documento 3, Chunk: 0, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q026",
+      "query_text": "Qual'e' la logica di riperimento dello sconto sulle righe di ordine di vendita implementata per MVM srl? Considera che il classificatore 5 e' lo stesso per entrambi i codici, che i codici non hanno nessuno sconto sul listino e che listino personalizzato del cliente vince sempre sugli sconti e sul comportamento standard",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.18181818181818182,
+        "precision_at_5": 0.6,
+        "recall_at_5": 0.2727272727272727,
+        "precision_at_10": 0.5,
+        "recall_at_10": 0.45454545454545453,
+        "avg_chunk_relevance_top3": 0.8333333333333334,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.7,
+        "retrieval_time": 2.100558042526245
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9278099211909887,
+        "generation_time": 11.187582015991211
+      },
+      "generated_answer": "La logica di reperimento dello sconto sulle righe di ordine di vendita per **MVM srl** è stata implementata tramite una personalizzazione specifica, che si basa sulle seguenti regole:\n\n1. **Classificatore 5 come chiave di raggruppamento**  \n   Gli articoli soggetti a questa logica sono identificati tramite il “classificatore generico 5” presente in anagrafica articolo [2], [7].\n\n2. **Sconto massimo per classificatore 5**  \n   Nella tabella del classificatore 5 è prevista una colonna aggiuntiva in cui si può indicare lo sconto massimo applicabile.  \n   - Se non è indicato alcun valore, non viene effettuato alcun controllo.\n   - Se è indicato 0, non viene applicato alcuno sconto a quella tipologia di articolo.\n   - Se lo sconto indicato sul documento supera quello massimo previsto dal classificatore, viene riportato sulla riga lo sconto massimo [2].\n\n3. **Gestione sconti per quantità (scaglioni)**  \n   Un plugin personalizzato raggruppa gli articoli per classificatore 5 e somma le quantità di tutte le righe che appartengono allo stesso classificatore. Se la quantità totale rientra in uno scaglione previsto dalla configurazione, viene applicato lo sconto previsto per quello scaglione (ad esempio, se la somma supera 299, si applica lo sconto del 20% su tutte le righe coinvolte) [6], [3].  \n   - Lo sconto così determinato viene valorizzato sul campo SCONTO2 delle righe documento (o su altro campo, in base alla configurazione) [3].\n   - Ad ogni salvataggio, la procedura sovrascrive i campi di sconto delle righe secondo la logica descritta [3].\n\n4. **Prevalenza del listino personalizzato**  \n   Se il prezzo della riga deriva da un listino personalizzato cliente, la logica del plugin NON interviene: il valore del listino personalizzato prevale sempre su qualsiasi altra logica di sconto o comportamento standard [2], [7].\n\n5. **Assenza di sconti sul listino**  \n   Se i codici non hanno sconto sul listino, non viene applicato alcuno sconto proveniente dal listino standard [1].\n\n6. **Comportamento standard**  \n   In assenza di listini personalizzati e di valori specifici sul classificatore 5, il sistema si comporta secondo la logica standard di SAM ERP2 (sconti per classe, quantità per singola riga, ecc.) [6].\n\n**Esempio pratico:**  \n- Due articoli con lo stesso classificatore 5, nessuno sconto sul listino, nessun listino personalizzato cliente: la procedura somma le quantità delle righe con lo stesso classificatore 5 e applica lo sconto per scaglione previsto, senza superare lo sconto massimo indicato nella tabella del classificatore.\n- Se invece esiste un listino personalizzato per il cliente, il prezzo e lo sconto di quel listino prevalgono e la logica di plugin non interviene.\n\n---\n\n### Documenti di riferimento:\n1. RI: [46443](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=46443) - Documento 1, Chunk: 3, Autore: Sistema, Cliente: Test  \n2. RI: [46443](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=46443) - Documento 2, Chunk: 1, Autore: Sistema, Cliente: Test  \n3. RI: [46445](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=46445) - Documento 3, Chunk: 1, Autore: Sistema, Cliente: Test  \n4. RI: [46445](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=46445) - Documento 6, Chunk: 0, Autore: Sistema, Cliente: Test  \n5. RI: [46443](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=46443) - Documento 7, Chunk: 0, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q027",
+      "query_text": "Qual e' la logica dietro al ricalcolo delle spese di trasporto sugli ordini di vendita fatto per Logos SPA?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.5,
+        "precision_at_5": 0.6,
+        "recall_at_5": 0.75,
+        "precision_at_10": 0.3,
+        "recall_at_10": 0.75,
+        "avg_chunk_relevance_top3": 0.5,
+        "avg_chunk_relevance_top5": 0.5,
+        "avg_chunk_relevance_top10": 0.35,
+        "retrieval_time": 3.600977659225464
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9340077575614152,
+        "generation_time": 7.966912031173706
+      },
+      "generated_answer": "La logica del ricalcolo delle spese di trasporto sugli ordini di vendita per Logos SPA è stata implementata tramite una personalizzazione (plugin), come richiesto dal cliente.\n\n### Logica di Calcolo Personalizzata\n\n- **Applicazione della logica**: Le spese di trasporto vengono calcolate secondo regole specifiche per ciascun cliente. Ad esempio:\n    - Per il Cliente B:  \n      - Se l’ordine è inferiore a 200 euro, vengono applicate spese di trasporto minime di 10 euro.\n      - Se l’ordine supera i 200 euro, non vengono applicate spese (0 euro).\n    - Per il Cliente C:\n      - Si applica sempre il 5% dell’importo dell’ordine come spese di trasporto, senza soglie minime o massime.\n      - Esempi:  \n        - Ordine da 100 euro → 5 euro di spese  \n        - Ordine da 210 euro → 10,5 euro di spese  \n      [5]\n\n- **Eventi di ricalcolo**:\n    - Il ricalcolo delle spese di trasporto non avviene solo in fase di inserimento ordine, ma anche in momenti successivi, ad esempio:\n        - Alla generazione delle fatture (inclusa la funzione di “Fatturazione Globale”).\n        - Dopo la verifica spedibilità commessa, quando vengono create fatture immediate: in questo caso è stato richiesto che le spese di trasporto siano già incluse nella fattura generata [2].\n        - Nel caso di spedizioni parziali (gestione DdT): la spesa di trasporto viene presentata come totale da ordine, ma per il calcolo corretto è necessario risalvare il documento. È stata richiesta l’estensione del ricalcolo a più eventi, in particolare sul DdT finale relativo al saldo ordine [4].\n\n- **Modalità di attivazione**:\n    - Il plugin che gestisce questa logica si attiva automaticamente nei processi sopra descritti, aggiornando le spese di trasporto e i totali dei documenti (ordine, fattura, DdT) ogni volta che viene eseguito uno degli eventi previsti [1][4].\n\n### Nota importante\nQuesta logica di calcolo delle spese di trasporto è una **personalizzazione specifica per Logos SPA** e non fa parte delle funzionalità standard di SAM ERP2.\n\n---\n\n#### Documenti di riferimento:\n1. RI: [53893](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53893) - Documento 1, Chunk: 4, Autore: Sistema, Cliente: Test  \n2. RI: [54122](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54122) - Documento 2, Chunk: 0, Autore: Sistema, Cliente: Test  \n3. RI: [53893](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53893) - Documento 3, Chunk: 0, Autore: Sistema, Cliente: Test  \n4. RI: [54579](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=54579) - Documento 4, Chunk: 3, Autore: Sistema, Cliente: Test  \n5. RI: [53893](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53893) - Documento 5, Chunk: 2, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q028",
+      "query_text": "Come vengono gestiti i listini personalizzati con scaglioni di quantita' \"Da-A\" e cosa succede quando la quantita' ordinata non rientra negli scaglioni definiti?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.6666666666666666,
+        "recall_at_3": 0.5,
+        "precision_at_5": 0.4,
+        "recall_at_5": 0.5,
+        "precision_at_10": 0.2,
+        "recall_at_10": 0.5,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.7,
+        "avg_chunk_relevance_top10": 0.5,
+        "retrieval_time": 2.2512717247009277
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9221813245985174,
+        "generation_time": 8.192329406738281
+      },
+      "generated_answer": "La gestione dei **listini personalizzati con scaglioni di quantità \"Da-A\"** in SAM ERP2, secondo le specifiche della richiesta di implementazione, prevede quanto segue:\n\n### Modalità di gestione\n\n- Nella tabella dei prezzi dei listini personalizzati sono presenti due campi: **\"q.tà da\"** (limite minimo dello scaglione) e **\"q.tà fino a\"** (limite massimo dello scaglione).\n- In fase di inserimento ordine, se esiste un listino personalizzato, il sistema verifica se la quantità ordinata rientra nello scaglione definito:\n    - **Se la quantità ordinata è compresa tra \"q.tà da\" e \"q.tà fino a\"**, viene applicato il prezzo del listino personalizzato.\n    - **Se la quantità ordinata è inferiore al minimo o superiore al massimo dello scaglione**, il listino personalizzato non viene considerato valido e il prezzo viene determinato secondo le logiche standard del listino base (\"normale\") [1].\n\n#### Esempio operativo\n- Scaglione definito: “q.tà da” = 50, “q.tà fino a” = 100.\n    - Ordine di quantità **49 o inferiore**: prezzo da listino base.\n    - Ordine di quantità **compresa tra 50 e 100**: prezzo da listino personalizzato.\n    - Ordine di quantità **oltre 100**: prezzo da listino base [1].\n\n### Gestione rispetto allo standard SAM ERP2\n\n- **Standard**: SAM ERP2 gestisce i prezzi per quantità tipicamente con logica \"a partire da\" o \"fino a\".\n- **Personalizzazione**: La logica \"Da-A\" per listini personalizzati e la conseguente esclusione del prezzo personalizzato fuori dagli scaglioni sono oggetto di una specifica richiesta di implementazione e non fanno parte della funzionalità standard [2].\n\n### Ulteriori dettagli\n\n- Se la quantità ordinata non raggiunge lo scaglione minimo previsto dal listino personalizzato, viene comunque recuperata la scontistica prevista dalla gestione standard, come da configurazione cliente/articolo [4].\n- La logica di attribuzione prezzi in base allo scaglione è consultabile solo nella finestra di inserimento/modifica dei listini di vendita di tipo personalizzato [6].\n\n---\n\n#### Documenti di riferimento:\n1. RI: [46533](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=46533) - Documento 1, Chunk: 1, Autore: Sistema, Cliente: Test\n2. RI: [46533](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=46533) - Documento 2, Chunk: 0, Autore: Sistema, Cliente: Test\n3. RI: [53152](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=53152) - Documento 3, Chunk: 4, Autore: Sistema, Cliente: Test\n4. RI: [50493](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=50493) - Documento 4, Chunk: 1, Autore: Sistema, Cliente: Test\n5. RI: [46533](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=46533) - Documento 6, Chunk: 5, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q029",
+      "query_text": "Listini con codice cliente: successivamente vengono applicate le provvigioni presenti su listini il cui codice coincide con quello del cliente della fattura, se validi alla data dell'ordine.",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.25,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.25,
+        "precision_at_10": 0.1,
+        "recall_at_10": 0.25,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.4,
+        "avg_chunk_relevance_top10": 0.4,
+        "retrieval_time": 2.180297613143921
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.8483931715233577,
+        "generation_time": 6.300215005874634
+      },
+      "generated_answer": "Per la gestione delle provvigioni nei listini con codice cliente in **SAM ERP2**, è stata implementata una personalizzazione specifica per il cliente Test. In questa personalizzazione, l’applicazione delle provvigioni segue una logica a cascata:\n\n1. **Listini con codice cliente**: Dopo aver gestito eventuali righe promozionali, vengono applicate le percentuali di provvigione presenti su listini che hanno il codice uguale a quello del cliente della fattura, a condizione che il listino sia valido alla data di inserimento dell’ordine di vendita. Questo significa che, per ogni riga documento, se esiste un listino con codice coincidente con il codice cliente e il periodo di validità copre la data dell’ordine, si applicherà la provvigione prevista da tale listino [1].\n\n2. **Personalizzazione**: Questa modalità di calcolo delle provvigioni è parte di una richiesta di personalizzazione e non rappresenta una funzionalità standard di SAM ERP2. La gestione riguarda solo le righe articolo e non le provvigioni di fondo documento. Le regole di calcolo sono variabili e includono anche altre casistiche (ad esempio provvigioni per sconti, gruppi articolo, promozioni, ecc.) definite nelle specifiche del cliente [2].\n\n3. **Procedura operativa**: In fase di liquidazione, vengono azzerate le provvigioni di riga e di fondo sulle fatture estratte. Successivamente, vengono eseguiti controlli sequenziali sulle righe con provvigione a zero, andando ad aggiornare solo quelle per cui il controllo precedente non ha trovato una provvigione. Il controllo relativo ai listini con codice cliente è il secondo in ordine di esecuzione [1].\n\n**Nota:** Queste regole sono attive solo se previste dalla personalizzazione richiesta per il cliente. La logica standard di SAM ERP2 non prevede l’applicazione automatica di provvigioni da listini con codice cliente, salvo implementazioni specifiche su richiesta.\n\n---\n\n### Documenti di riferimento:\n1. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 1, Chunk: 4, Autore: Sistema, Cliente: Test\n2. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 2, Chunk: 1, Autore: Sistema, Cliente: Test\n3. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 6, Chunk: 8, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q030",
+      "query_text": "Quali righe di fattura vengono considerate nel calcolo delle provvigioni e quali vengono escluse nella RI_51576?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.0,
+        "recall_at_3": 0.0,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.25,
+        "precision_at_10": 0.3,
+        "recall_at_10": 0.75,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.6,
+        "avg_chunk_relevance_top10": 0.6,
+        "retrieval_time": 2.0315921306610107
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9133216764499372,
+        "generation_time": 10.568467378616333
+      },
+      "generated_answer": "Nella RI_51576, il calcolo delle provvigioni è oggetto di una personalizzazione specifica. In base ai documenti forniti, le regole principali sono le seguenti:\n\n### Righe di fattura considerate nel calcolo delle provvigioni\n- **Vengono considerate solo le righe associate ad articoli**: la personalizzazione richiede che il calcolo delle provvigioni sia applicato esclusivamente sulle righe dei documenti che sono collegate ad articoli [1].\n- **Sono gestite diverse casistiche di provvigione**: la personalizzazione prevede regole variabili per il calcolo della provvigione, tra cui:\n  - Provvigione agente standard\n  - Provvigione agente per sconti\n  - Provvigioni fisse su clienti\n  - Provvigioni su listini con prezzi netti clienti\n  - Provvigioni legate a gruppi articolo e sconti applicati\n  - Provvigioni su listino promozionale (identificato dal campo \"Riferi1\" = 'PROMO')\n  - Provvigioni su articoli specifici con sconti particolari\n  - Provvigioni particolari per clienti in presenza di sconti fuori standard [1], [5]\n\n### Righe di fattura escluse dal calcolo delle provvigioni\n- **Sono escluse le provvigioni di fondo documento**: la personalizzazione specifica che non devono essere considerate le provvigioni di fondo documento, ma solo quelle di riga associate ad articoli [1].\n- **Sono escluse le righe non associate ad articoli**: quindi eventuali righe di spesa, di riepilogo o altre righe non collegate ad articoli non rientrano nel calcolo [1].\n- **Le righe già liquidate non vengono aggiornate**: vengono prese in considerazione solo le fatture non ancora liquidate [3].\n- **Le righe per cui la provvigione è già stata assegnata non vengono ricalcolate**: la procedura aggiorna solo le righe con provvigione a zero [2].\n\n### Processo operativo\n- In fase di elaborazione, tutte le percentuali di provvigione sulle righe e sul fondo delle fatture del periodo selezionato vengono azzerate.\n- L’assegnazione della provvigione segue una successione gerarchica di controlli, aggiornando solo le righe che non hanno ancora una provvigione assegnata [3], [2].\n- Il calcolo avviene a consuntivo, selezionando il periodo da elaborare, e può essere sovrascritto rispetto allo standard [4].\n\n### Dettagli aggiuntivi\n- Le righe legate a promozioni sono identificate dal campo \"Riferi1\" = 'PROMO' e vengono elaborate con regole specifiche [6].\n- Non sono previsti ulteriori controlli aggiuntivi sulle righe che restano senza provvigione al termine dell’operazione [5].\n\n---\n\n**In sintesi:**  \nNel calcolo delle provvigioni della RI_51576 vengono considerate solo le righe di fattura associate ad articoli. Sono escluse le righe di fondo documento e tutte le righe non collegate ad articoli. Il calcolo segue regole personalizzate e viene effettuato solo sulle righe non già liquidate o con provvigione già assegnata.\n\n---\n\nDocumenti di riferimento:\n1. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 2, Chunk: 1, Autore: Sistema, Cliente: Test\n2. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 3, Chunk: 8, Autore: Sistema, Cliente: Test\n3. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 4, Chunk: 3, Autore: Sistema, Cliente: Test\n4. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 9, Chunk: 2, Autore: Sistema, Cliente: Test\n5. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 7, Chunk: 6, Autore: Sistema, Cliente: Test\n6. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 8, Chunk: 4, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    },
+    {
+      "query_id": "Q031",
+      "query_text": "In quale momento e da quale funzione applicativa viene avviato il ricalcolo delle provvigioni nella RI_51576?",
+      "retrieval_metrics": {
+        "precision_at_3": 0.3333333333333333,
+        "recall_at_3": 0.5,
+        "precision_at_5": 0.2,
+        "recall_at_5": 0.5,
+        "precision_at_10": 0.1,
+        "recall_at_10": 0.5,
+        "avg_chunk_relevance_top3": 0.6666666666666666,
+        "avg_chunk_relevance_top5": 0.6,
+        "avg_chunk_relevance_top10": 0.45,
+        "retrieval_time": 2.6653664112091064
+      },
+      "generation_metrics": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 1.0,
+        "semantic_similarity": 0.9373977175604624,
+        "generation_time": 3.954671621322632
+      },
+      "generated_answer": "Il ricalcolo delle provvigioni nella RI_51576 viene avviato durante la fase di elaborazione provvigioni, quando si seleziona il periodo da elaborare. In particolare, la funzione applicativa coinvolta è il \"Riepilogo e Maturazione Provvigioni\", dove è stato aggiunto un pulsante personalizzato. Alla pressione di questo pulsante, l’utente può definire un intervallo di date (Data Inizio e Data Fine) e il sistema prende in considerazione tutte le fatture non ancora liquidate, inserite nel periodo indicato, aggiornando la provvigione direttamente sulle righe della fattura [2].\n\nIn sintesi:\n- Il ricalcolo viene avviato manualmente dall’utente nel \"Riepilogo e Maturazione Provvigioni\".\n- L’utente seleziona un intervallo di date tramite il pulsante personalizzato.\n- La funzione ricalcola le provvigioni sulle righe delle fatture del periodo selezionato.\n\nDocumenti di riferimento:\n1. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 1, Chunk: 2, Autore: Sistema, Cliente: Test\n2. RI: [51576](https://intranet.centrosoftware.com/IntraCSW/script/vedi_RI.asp?idRI=51576) - Documento 2, Chunk: 3, Autore: Sistema, Cliente: Test",
+      "retrieved_chunk_count": 10
+    }
+  ],
+  "total_evaluation_time": 710.5508534908295
+}

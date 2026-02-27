@@ -1,6 +1,6 @@
 import streamlit as st
 import ui
-import llm
+from llm import gpt_request
 
 # Configurazine base
 st.set_page_config(page_title="Assistente Documentale RI", page_icon="https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", layout="wide")
@@ -12,7 +12,7 @@ ui.apply_style()
 with st.sidebar:
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.image("https://www.digitalrecruitingweek.it/wp-content/uploads/2023/03/CENTRO-SOFTWARE-logo.png", width=225)
+        st.image("https://www.jobserviceunivpm.it/event/assets/img/loghi_aziende/Logo_CS_TEC_RGB_1x1_002_LG_1.jpeg", width=225)
     st.markdown("### 📄 Assistente Documentale RI")
     st.markdown("Accedi al tuo account e inizia a chattare con l'Assistente Documentale per ricerca RAG delle RI")
     st.markdown("---")
@@ -105,7 +105,7 @@ if prompt := st.chat_input("Scrivi qui..."):
             full_response = ""
             message_placeholder = st.empty()
 
-            for token in llm.gpt_request(st.session_state.messages):
+            for token in gpt_request(st.session_state.messages):
                 full_response += token
                 message_placeholder.markdown(full_response + "▌")
             

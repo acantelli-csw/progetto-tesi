@@ -92,7 +92,6 @@ class EvaluationQuery:
     query_text:         str
     relevant_chunk_ids: List[str]
     relevant_doc_ids:   List[str]           = field(default_factory=list)
-    relevant_spans:     List[str]           = field(default_factory=list)
     reference_answer:   Optional[str]       = None
     # Campi specifici query negative (None = query positiva)
     expected_behavior:  Optional[str]       = None
@@ -101,11 +100,6 @@ class EvaluationQuery:
     @property
     def is_negative(self) -> bool:
         return self.expected_behavior is not None
-
-    @property
-    def has_spans(self) -> bool:
-        """True se il dataset è stato migrato al formato span-based."""
-        return len(self.relevant_spans) > 0
 
 @dataclass
 class RetrievalResult:
@@ -172,7 +166,6 @@ def load_gold_dataset(filepath: str) -> List[EvaluationQuery]:
             query_text         = item['query_text'],
             relevant_chunk_ids = item.get('relevant_chunk_ids', []),
             relevant_doc_ids   = item.get('relevant_doc_ids', []),
-            relevant_spans     = item.get('relevant_spans', []),
             reference_answer   = item.get('reference_answer'),
             expected_behavior  = item.get('expected_behavior'),
             negative_reason    = item.get('negative_reason')
@@ -225,81 +218,6 @@ def calculate_recall_at_k_normalized(
         return 0.0
     top_k = retrieved_ids[:k]
     return sum(1 for doc_id in top_k if doc_id in relevant_ids) / min(k, len(relevant_ids))
-
-# ── Metriche span-centriche ───────────────────────────────────────────────────
-
-def chunk_covers_span(
-    chunk_text: str,
-    span:       str,
-    threshold:  float = 0.7
-) -> bool:
-    """
-    Verifica se un chunk recuperato copre uno span di riferimento.
-
-    Prima controlla la sottostringa esatta (caso più comune dopo lo snellimento
-    degli span con LLM). Se fallisce usa SequenceMatcher con soglia configurabile
-    per gestire piccole differenze di whitespace o troncature di overlap.
-
-    threshold=0.7 è conservativo: richiede che il 70% del testo dello span
-    più corto sia comune con il chunk. Abbassarlo aumenta i falsi positivi,
-    alzarlo aumenta i falsi negativi su span lunghi con overlap parziale.
-    """
-    span_clean  = span.strip()
-    chunk_clean = chunk_text.strip()
-
-    if not span_clean:
-        return False
-
-    # Controllo sottostringa esatta (O(n) — veloce)
-    if span_clean in chunk_clean:
-        return True
-
-    # Fallback SequenceMatcher su testi normalizzati
-    ratio = SequenceMatcher(None, chunk_clean, span_clean).ratio()
-    return ratio >= threshold
-
-def calculate_span_precision_at_k(
-    retrieved_texts: List[str],
-    relevant_spans:  List[str],
-    k:               int,
-    threshold:       float = 0.7
-) -> float:
-    """
-    P@k span-based = chunk tra i top-k che coprono ≥1 span / k
-
-    Un chunk è "rilevante" se contiene almeno uno degli span di riferimento.
-    """
-    if k == 0 or not retrieved_texts or not relevant_spans:
-        return 0.0
-    top_k = retrieved_texts[:k]
-    relevant_count = sum(
-        1 for chunk in top_k
-        if any(chunk_covers_span(chunk, span, threshold) for span in relevant_spans)
-    )
-    return relevant_count / k
-
-def calculate_span_recall_at_k(
-    retrieved_texts: List[str],
-    relevant_spans:  List[str],
-    k:               int,
-    threshold:       float = 0.7
-) -> float:
-    """
-    R@k span-centrica = span coperti da ≥1 chunk tra i top-k / totale span
-
-    Risponde alla domanda: "quante delle informazioni necessarie per rispondere
-    sono state recuperate?". È invariante al chunking: se due span finiscono
-    nello stesso chunk, vengono entrambi coperti recuperando un solo documento.
-    """
-    if not relevant_spans:
-        return 0.0
-    top_k = retrieved_texts[:k]
-    covered = sum(
-        1 for span in relevant_spans
-        if any(chunk_covers_span(chunk, span, threshold) for chunk in top_k)
-    )
-    return covered / len(relevant_spans)
-
 
 def evaluate_chunk_relevance_with_llm(
     query:      str,
@@ -365,40 +283,26 @@ def calculate_average_chunk_relevance(
     return float(np.mean(scores))
 
 def evaluate_retrieval_for_query(
-    query:              EvaluationQuery,
-    retrieval_result:   RetrievalResult,
-    client:             AzureOpenAI,
-    k_values:           List[int] = [1, 3, 5, 10],
-    llm_model:          str   = JUDGE_MODEL,
-    compute_doc_recall: bool  = False,
-    span_threshold:     float = 0.7
+    query:             EvaluationQuery,
+    retrieval_result:  RetrievalResult,
+    client:            AzureOpenAI,
+    k_values:          List[int] = [1, 3, 5, 10],
+    llm_model:         str = JUDGE_MODEL,
+    compute_doc_recall: bool = False
 ) -> Dict[str, float]:
     """
     Calcola le metriche di retrieval per una singola query positiva.
 
-    Metriche calcolate per ogni k:
-      Chunk-level (usa relevant_chunk_ids — dipende dal chunking):
-        precision_at_k       P@k chunk-based
-        recall_at_k          R@k standard
-        recall_at_k_norm     R@k normalizzata con min(k, |R|) al denominatore
-
-      Span-level (usa relevant_spans — invariante al chunking):
-        span_precision_at_k  P@k span-based: chunk top-k che coprono ≥1 span / k
-        span_recall_at_k     R@k span-centrica: span coperti da top-k / totale span
-        Disponibili solo dopo migrazione con migrate_to_spans.py.
-        Sono le metriche preferite per il confronto tra configurazioni di chunking.
-
-      Document-level (usa relevant_doc_ids — solo per confronto chunking):
-        doc_recall_at_k      Abilitato solo se compute_doc_recall=True.
-        Utile come fallback se gli span non sono disponibili.
-
-      LLM-as-judge:
-        avg_chunk_relevance_topk  Rilevanza media chunk top-k (rubrica 0/1/2)
+    compute_doc_recall: se True calcola anche doc_recall_at_k (document-level,
+    indipendente dal chunking). Va abilitato SOLO nell'esperimento di confronto
+    tra configurazioni di chunking diverse, dove i chunk ID cambiano ma il
+    documento di riferimento rimane stabile. Nelle altre comparazioni è ridondante
+    rispetto alla chunk-level recall e viene omesso per chiarezza.
     """
     metrics = {}
 
-    chunk_ids     = retrieval_result.retrieved_chunk_ids
-    chunk_texts   = retrieval_result.retrieved_chunk_texts
+    chunk_ids = retrieval_result.retrieved_chunk_ids
+    # Per doc-level: estrae il NumRI dai chunk recuperati
     retrieved_doc_ids = list(dict.fromkeys(cid.split("_")[0] for cid in chunk_ids))
 
     for k in k_values:
@@ -412,16 +316,6 @@ def evaluate_retrieval_for_query(
         metrics[f"recall_at_{k}_norm"] = calculate_recall_at_k_normalized(
             chunk_ids, query.relevant_chunk_ids, k
         )
-
-        # --- Span-level (se disponibili) ---
-        if query.has_spans:
-            metrics[f"span_precision_at_{k}"] = calculate_span_precision_at_k(
-                chunk_texts, query.relevant_spans, k, span_threshold
-            )
-            metrics[f"span_recall_at_{k}"] = calculate_span_recall_at_k(
-                chunk_texts, query.relevant_spans, k, span_threshold
-            )
-
         # --- Document-level (solo per confronto chunking) ---
         if compute_doc_recall and query.relevant_doc_ids:
             metrics[f"doc_recall_at_{k}"] = calculate_recall_at_k(
@@ -430,7 +324,9 @@ def evaluate_retrieval_for_query(
 
         # --- LLM-as-judge chunk relevance ---
         metrics[f"avg_chunk_relevance_top{k}"] = calculate_average_chunk_relevance(
-            query.query_text, chunk_texts, client, llm_model, top_k=k
+            query.query_text,
+            retrieval_result.retrieved_chunk_texts,
+            client, llm_model, top_k=k
         )
 
     metrics["retrieval_time"] = retrieval_result.retrieval_time
@@ -1418,8 +1314,7 @@ def compare_test_results(test_results: List[TestResult]):
     print("="*130)
 
     col = 38
-    col = 38
-    print(f"\n{'Configurazione':<{col}} {'P@5':>7} {'R@5':>7} {'R@5n':>7} {'SpR@5':>7} {'LLM-Rel':>8} {'Faith':>7} {'Relev':>7} {'SemSim':>7} {'Robust':>8}")
+    print(f"\n{'Configurazione':<{col}} {'P@5':>7} {'R@5':>7} {'R@5n':>7} {'LLM-Rel':>8} {'Faith':>7} {'Relev':>7} {'SemSim':>7} {'Robust':>8}")
     print("-"*130)
 
     for result in test_results:
@@ -1427,27 +1322,26 @@ def compare_test_results(test_results: List[TestResult]):
         p5      = result.retrieval_metrics.get('avg_precision_at_5', 0.0)
         r5      = result.retrieval_metrics.get('avg_recall_at_5', 0.0)
         r5n     = result.retrieval_metrics.get('avg_recall_at_5_norm', 0.0)
-        spr5    = result.retrieval_metrics.get('avg_span_recall_at_5', 0.0)
         llmrel  = result.retrieval_metrics.get('avg_avg_chunk_relevance_top5', 0.0)
         faith   = result.generation_metrics.get('avg_faithfulness', 0.0)
         relev   = result.generation_metrics.get('avg_answer_relevancy', 0.0)
         semsim  = result.generation_metrics.get('avg_semantic_similarity') or 0.0
         robust  = result.negative_eval_metrics.get('robustness_overall', 0.0)
 
-        print(f"{name:<{col}} {p5:>7.4f} {r5:>7.4f} {r5n:>7.4f} {spr5:>7.4f} {llmrel:>8.4f} {faith:>7.4f} {relev:>7.4f} {semsim:>7.4f} {robust:>8.4f}")
+        print(f"{name:<{col}} {p5:>7.4f} {r5:>7.4f} {r5n:>7.4f} {llmrel:>8.4f} {faith:>7.4f} {relev:>7.4f} {semsim:>7.4f} {robust:>8.4f}")
 
     print("="*130)
     print("\nLegenda:")
     print("  P@5     = Precision@5 (chunk-level)")
     print("  R@5     = Recall@5 standard (chunk-level)")
     print("  R@5n    = Recall@5 normalizzata — denominatore min(5, |R|)")
-    print("  SpR@5   = Span Recall@5 — span coperti tra top-5 / totale span  (0.0 se no spans)")
     print("  LLM-Rel = LLM-as-judge chunk relevance (rubrica 0/1/2, media top-5)")
-    print("  Faith   = Faithfulness con claim atomici (LLM-as-judge)")
+    print("  Faith   = Faithfulness (LLM-as-judge, rubrica 0/1/2)")
     print("  Relev   = Answer Relevancy (LLM-as-judge, rubrica 0/1/2)")
     print("  SemSim  = Semantic Similarity (cosine su embeddings)")
     print("  Robust  = Robustezza su query negative (0=fallisce, 1=gestisce correttamente)")
     print()
+
 
 # ==================== TEST PRINCIPALE ====================
 
@@ -1610,116 +1504,96 @@ def esempio_confronto_strategie():
 # ==================== ABLATION STUDY ====================
 
 def run_ablation_study(
-    gold_dataset_path: str       = GOLD_DATASET_PATH,
-    results_dir:       str       = "evaluation_results/ablation",
-    dimensions:        List[str] = None
+    gold_dataset_path: str = GOLD_DATASET_PATH,
+    results_dir:       str = "evaluation_results/ablation"
 ) -> Dict[str, TestResult]:
     """
     Ablation study sequenziale: parte dalla BASELINE_CONFIG e varia
     una dimensione per volta, mantenendo tutto il resto fisso.
 
-    Dimensioni disponibili:
+    Dimensioni testate:
       A) Strategia di search   : multistage (baseline) | hybrid | semantic | keyword
-      B) Tipo di chunking       : recursive_custom_1024 (baseline) | fixed_512 | recursive_standard_1024
+      B) Chunking               : recursive_custom_1024 (baseline) | fixed_512 | recursive_standard_1024
       C) Dimensione chunk       : 1024/overlap150 (baseline) | 512/overlap100
       D) Modello embedding      : ada-002 (baseline) | text-embedding-3-large
       E) Modello LLM generativo : gpt-4.1 (baseline) | gpt-5
       F) Top-k documenti        : 10 (baseline) | 8 | 15
 
-    Parametri:
-      dimensions: lista opzionale di lettere per eseguire solo i gruppi
-                  specificati. Se None, esegue tutto. Esempi:
-                    run_ablation_study(dimensions=["A", "E", "F"])
-                    run_ablation_study(dimensions=["B", "C"])
-                    run_ablation_study(dimensions=["D"])
+    Per il confronto chunking (B e C) viene abilitato compute_doc_recall=True
+    in modo da poter confrontare le strategie indipendentemente dalla
+    frammentazione del documento.
 
-                  Utile per sessioni separate in base al DB attivo:
-                    - DB baseline (recursive custom 1024, ada-002) : ["A", "E", "F"]
-                    - DB re-indicizzato con fixed 512              : ["B", "C"]
-                    - DB re-indicizzato con recursive standard     : ["B"]  (solo B3)
-                    - DB re-indicizzato con embedding-3-large      : ["D"]
-
-    Per B e C viene abilitato automaticamente compute_doc_recall=True,
-    poiché i chunk ID cambiano al variare del chunking e la metrica
-    document-level è l'unico confronto stabile tra configurazioni diverse.
+    Nota: il cambio di chunking/embedding richiede che il database sia stato
+    pre-indicizzato con la configurazione corrispondente prima di eseguire
+    il test. La pipeline di valutazione si assume che il sistema sia già
+    configurato correttamente — non gestisce il re-embedding automatico.
     """
-    active = set(d.upper() for d in dimensions) if dimensions else None
 
     results: Dict[str, TestResult] = {}
     all_configs = []
 
     # ── A: Strategia di search ──────────────────────────────────────────
-    if active is None or "A" in active:
-        for strategy, name in [
-            (SearchStrategy.MULTISTAGE, "A1_multistage_baseline"),
-            (SearchStrategy.HYBRID,     "A2_hybrid_fixed"),
-            (SearchStrategy.SEMANTIC,   "A3_semantic_only"),
-            (SearchStrategy.KEYWORD,    "A4_keyword_only"),
-        ]:
-            cfg = {**BASELINE_CONFIG, "name": name, "search_strategy": strategy}
-            all_configs.append(("A", cfg, strategy, False))
+    for strategy, name in [
+        (SearchStrategy.MULTISTAGE, "A1_multistage_baseline"),
+        (SearchStrategy.HYBRID,     "A2_hybrid_fixed"),
+        (SearchStrategy.SEMANTIC,   "A3_semantic_only"),
+        (SearchStrategy.KEYWORD,    "A4_keyword_only"),
+    ]:
+        cfg = {**BASELINE_CONFIG, "name": name, "search_strategy": strategy}
+        all_configs.append(("search", cfg, strategy, False))
 
     # ── B: Tipo di chunking (doc_recall abilitato) ───────────────────────
-    if active is None or "B" in active:
-        for chunking, name in [
-            ("recursive_custom_1024",   "B1_recursive_custom_baseline"),
-            ("fixed_512",               "B2_fixed_size_512"),
-            ("recursive_standard_1024", "B3_recursive_standard_1024"),
-        ]:
-            cfg = {**BASELINE_CONFIG, "name": name, "chunking": chunking}
-            all_configs.append(("B", cfg, BASELINE_CONFIG["search_strategy"], True))
+    for chunking, name in [
+        ("recursive_custom_1024",   "B1_recursive_custom_baseline"),
+        ("fixed_512",               "B2_fixed_size_512"),
+        ("recursive_standard_1024", "B3_recursive_standard_1024"),
+    ]:
+        cfg = {**BASELINE_CONFIG, "name": name, "chunking": chunking}
+        all_configs.append(("chunking", cfg, BASELINE_CONFIG["search_strategy"], True))
 
     # ── C: Dimensione chunk (doc_recall abilitato) ────────────────────────
-    if active is None or "C" in active:
-        for chunk_size, overlap, name in [
-            (1024, 150, "C1_chunk1024_overlap150_baseline"),
-            (512,  100, "C2_chunk512_overlap100"),
-        ]:
-            cfg = {**BASELINE_CONFIG, "name": name,
-                   "chunk_size": chunk_size, "chunk_overlap": overlap}
-            all_configs.append(("C", cfg, BASELINE_CONFIG["search_strategy"], True))
+    for chunk_size, overlap, name in [
+        (1024, 150, "C1_chunk1024_overlap150_baseline"),
+        (512,  100, "C2_chunk512_overlap100"),
+    ]:
+        cfg = {**BASELINE_CONFIG, "name": name,
+               "chunk_size": chunk_size, "chunk_overlap": overlap}
+        all_configs.append(("chunking", cfg, BASELINE_CONFIG["search_strategy"], True))
 
     # ── D: Modello embedding ─────────────────────────────────────────────
-    if active is None or "D" in active:
-        for emb_model, name in [
-            ("text-embedding-ada-002", "D1_ada002_baseline"),
-            ("text-embedding-3-large", "D2_embedding3large"),
-        ]:
-            cfg = {**BASELINE_CONFIG, "name": name, "embedding_model": emb_model}
-            all_configs.append(("D", cfg, BASELINE_CONFIG["search_strategy"], False))
+    for emb_model, name in [
+        ("text-embedding-ada-002",   "D1_ada002_baseline"),
+        ("text-embedding-3-large",   "D2_embedding3large"),
+    ]:
+        cfg = {**BASELINE_CONFIG, "name": name, "embedding_model": emb_model}
+        all_configs.append(("embedding", cfg, BASELINE_CONFIG["search_strategy"], False))
 
     # ── E: Modello LLM generativo ────────────────────────────────────────
-    if active is None or "E" in active:
-        for llm_model, name in [
-            ("gpt-4.1", "E1_gpt41_baseline"),
-            ("gpt-5",   "E2_gpt5"),
-        ]:
-            cfg = {**BASELINE_CONFIG, "name": name, "llm_model": llm_model}
-            all_configs.append(("E", cfg, BASELINE_CONFIG["search_strategy"], False))
+    for llm_model, name in [
+        ("gpt-4.1", "E1_gpt41_baseline"),
+        ("gpt-5",   "E2_gpt5"),
+    ]:
+        cfg = {**BASELINE_CONFIG, "name": name, "llm_model": llm_model}
+        all_configs.append(("llm", cfg, BASELINE_CONFIG["search_strategy"], False))
 
     # ── F: Top-k ─────────────────────────────────────────────────────────
-    if active is None or "F" in active:
-        for top_k, name in [
-            (10, "F1_topk10_baseline"),
-            (8,  "F2_topk8"),
-            (15, "F3_topk15"),
-        ]:
-            cfg = {**BASELINE_CONFIG, "name": name, "top_k": top_k}
-            all_configs.append(("F", cfg, BASELINE_CONFIG["search_strategy"], False))
-
-    if not all_configs:
-        print(f"Nessuna dimensione valida tra quelle specificate: {dimensions}")
-        return results
+    for top_k, name in [
+        (10, "F1_topk10_baseline"),
+        (8,  "F2_topk8"),
+        (15, "F3_topk15"),
+    ]:
+        cfg = {**BASELINE_CONFIG, "name": name, "top_k": top_k}
+        all_configs.append(("topk", cfg, BASELINE_CONFIG["search_strategy"], False))
 
     # ── Esecuzione ────────────────────────────────────────────────────────
     total = len(all_configs)
-    dims_label = ", ".join(sorted(active)) if active else "A-F"
     print(f"\n{'='*70}")
-    print(f"ABLATION STUDY — dimensioni: {dims_label} ({total} esperimenti)")
+    print(f"ABLATION STUDY: {total} esperimenti")
     print(f"{'='*70}\n")
 
     for i, (dimension, cfg, strategy, use_doc_recall) in enumerate(all_configs, 1):
-        print(f"\n[{i}/{total}] [{dimension}]  {cfg['name']}")
+        print(f"\n[{i}/{total}] Dimensione: {dimension.upper()}  —  {cfg['name']}")
+
         result = run_test_with_your_pipeline(
             gold_dataset_path  = gold_dataset_path,
             configuration      = cfg,
@@ -1730,10 +1604,11 @@ def run_ablation_study(
         results[cfg["name"]] = result
 
     print(f"\n{'='*70}")
-    print(f"ABLATION STUDY COMPLETATO — {len(results)}/{total} esperimenti")
+    print("ABLATION STUDY COMPLETATO")
     print(f"{'='*70}")
     compare_test_results(list(results.values()))
     return results
+
 
 
 def main():

@@ -32,9 +32,10 @@ from file_embedding.embedding import get_embedding
 # ==================== CONFIGURAZIONE ====================
 
 class SearchStrategy:
-    SEMANTIC = "semantic"  # Vector similarity
-    KEYWORD = "keyword"    # BM25
-    HYBRID = "hybrid"      # Combinazione di entrambi
+    SEMANTIC = "semantic"      # Vector similarity
+    KEYWORD = "keyword"        # BM25
+    HYBRID = "hybrid"          # Combinazione di entrambi
+    MULTISTAGE = "multistage"  # Pipeline multi-stage con tool selection adattivo
 
 GOLD_DATASET_PATH = "C:/Users/ACantelli/OneDrive - centrosoftware.com/Documenti/GitHub/progetto-tesi/main/evaluation/gold_dataset.json"
 
@@ -69,6 +70,7 @@ class RetrievalResult:
     retrieved_chunk_ids: List[str]
     retrieved_chunk_texts: List[str]
     retrieval_time: float
+    tool_decision: Optional[Dict] = None  # Solo per strategia MULTISTAGE: decisione decide_tools()
 
 @dataclass
 class GenerationResult:
@@ -624,6 +626,163 @@ def run_retrieval_hybrid(
     print(f"\n{'='*70}\n")
     return retrieval_results
 
+# Esegue retrieval con pipeline multi-stage (tool selection adattivo)
+def run_retrieval_with_multistage(
+    queries: List[EvaluationQuery],
+    top_k: int = 10
+) -> List[RetrievalResult]:
+    """
+    Retrieval adattivo: per ogni query chiama decide_tools() per scegliere
+    quale retriever usare (semantic, keyword o entrambi), tracciando le decisioni
+    per calcolare la distribuzione dell'utilizzo degli strumenti.
+    """
+
+    retrieval_results = []
+
+    print(f"\n{'='*70}")
+    print(f"RETRIEVAL MULTI-STAGE (adattivo): {len(queries)} query")
+    print(f"{'='*70}\n")
+
+    for i, query in enumerate(queries, 1):
+        print(f"[{i}/{len(queries)}] {query.query_text[:60]}...")
+
+        start_time = time.time()
+
+        try:
+            # Step 1: tool selection
+            tool_decision = your_llm.decide_tools(query.query_text)
+            use_semantic = tool_decision.get("use_semantic", False)
+            use_keyword = tool_decision.get("use_keyword", False)
+
+            # Step 2: retrieval in base alla decisione
+            all_docs = []
+            if use_semantic:
+                semantic_docs = search.semantic_search(query.query_text, top_n=top_k)
+                for doc in semantic_docs:
+                    doc["retrieval_sources"] = ["semantic"]
+                all_docs += semantic_docs
+
+            if use_keyword:
+                keyword_docs = search.keyword_search(query.query_text, top_n=top_k)
+                for doc in keyword_docs:
+                    doc["retrieval_sources"] = ["keyword"]
+                all_docs += keyword_docs
+
+            # Deduplicazione con merge sorgenti
+            seen = {}
+            
+            total_before_dedup = len(all_docs) # ADDED
+
+            for doc in all_docs:
+                key = (doc["numero"], doc["progressivo"])
+                if key not in seen:
+                    seen[key] = doc
+                else:
+                    existing = seen[key].get("retrieval_sources", [])
+                    incoming = doc.get("retrieval_sources", [])
+                    seen[key]["retrieval_sources"] = list(set(existing + incoming))
+                    if doc.get("similarity", 0) > seen[key].get("similarity", 0):
+                        seen[key]["similarity"] = doc["similarity"]
+            all_docs = list(seen.values())
+            
+            total_after_dedup = len(all_docs) # ADDED
+            co_retrieved_count = total_before_dedup - total_after_dedup
+            if total_before_dedup > 0:
+                co_retrieved_pct = (co_retrieved_count / total_before_dedup) * 100
+                print(f"  → Co-retrieval: {co_retrieved_count}/{total_before_dedup} chunk ({co_retrieved_pct:.1f}%)")
+
+            retrieved_chunk_ids = [
+                f"{doc['numero']}_{doc['progressivo']}"
+                for doc in all_docs
+            ]
+            retrieved_chunk_texts = [doc['content'] for doc in all_docs]
+
+            # Log decisione
+            if use_semantic and use_keyword:
+                mode = "HYBRID (semantic + keyword)"
+            elif use_semantic:
+                mode = "SEMANTIC only"
+            elif use_keyword:
+                mode = "KEYWORD only"
+            else:
+                mode = "NESSUNA RICERCA"
+
+            print(f"  → Tool selection: {mode}")
+            print(f"  → Reason: {tool_decision.get('reason', '')[:80]}")
+            print(f"  ✓ {len(retrieved_chunk_ids)} chunk recuperati")
+
+        except Exception as e:
+            print(f"  ✗ Errore: {e}")
+            retrieved_chunk_ids = []
+            retrieved_chunk_texts = []
+            tool_decision = {"use_semantic": False, "use_keyword": False, "reason": f"Errore: {e}"}
+
+        retrieval_time = time.time() - start_time
+
+        result = RetrievalResult(
+            query_id=query.query_id,
+            retrieved_chunk_ids=retrieved_chunk_ids,
+            retrieved_chunk_texts=retrieved_chunk_texts,
+            retrieval_time=retrieval_time,
+            tool_decision=tool_decision
+        )
+        retrieval_results.append(result)
+
+    print(f"\n{'='*70}\n")
+    return retrieval_results
+
+
+# Aggrega le statistiche di tool selection per la strategia MULTISTAGE
+def aggregate_tool_selection_stats(retrieval_results: List[RetrievalResult]) -> Dict:
+    """
+    Calcola la distribuzione delle decisioni di tool selection su tutte le query.
+    Utile per giustificare empiricamente il valore dello step di selezione adattiva
+    rispetto all'approccio hybrid fisso.
+    """
+
+    decisions = [r.tool_decision for r in retrieval_results if r.tool_decision is not None]
+
+    if not decisions:
+        return {}
+
+    total = len(decisions)
+    semantic_only  = sum(1 for d in decisions if d.get("use_semantic") and not d.get("use_keyword"))
+    keyword_only   = sum(1 for d in decisions if d.get("use_keyword") and not d.get("use_semantic"))
+    both           = sum(1 for d in decisions if d.get("use_semantic") and d.get("use_keyword"))
+    none_selected  = sum(1 for d in decisions if not d.get("use_semantic") and not d.get("use_keyword"))
+
+    stats = {
+        "total_queries": total,
+        "semantic_only_count": semantic_only,
+        "keyword_only_count": keyword_only,
+        "both_count": both,
+        "none_count": none_selected,
+        "pct_semantic_only": round(semantic_only / total * 100, 1),
+        "pct_keyword_only": round(keyword_only / total * 100, 1),
+        "pct_both": round(both / total * 100, 1),
+        "pct_none": round(none_selected / total * 100, 1),
+        # Quante volte è stato evitato di usare entrambi (risparmio rispetto a hybrid fisso)
+        "pct_avoided_hybrid": round((semantic_only + keyword_only + none_selected) / total * 100, 1),
+        "per_query_decisions": [
+            {
+                "query_id": r.query_id,
+                "use_semantic": r.tool_decision.get("use_semantic"),
+                "use_keyword": r.tool_decision.get("use_keyword"),
+                "mode": (
+                    "both" if r.tool_decision.get("use_semantic") and r.tool_decision.get("use_keyword")
+                    else "semantic_only" if r.tool_decision.get("use_semantic")
+                    else "keyword_only" if r.tool_decision.get("use_keyword")
+                    else "none"
+                ),
+                "reason": r.tool_decision.get("reason", "")
+            }
+            for r in retrieval_results if r.tool_decision is not None
+        ]
+    }
+
+    return stats
+
+
 # Esegue generation della risposta tramite LLM
 def run_generation_with_llm(
     queries: List[EvaluationQuery],
@@ -898,6 +1057,8 @@ def run_test_with_your_pipeline(
     elif search_strategy == SearchStrategy.HYBRID:
         retrieval_results = run_retrieval_hybrid(gold_queries, top_k, semantic_weight=configuration.get('semantic_weight', 0.7)
         )
+    elif search_strategy == SearchStrategy.MULTISTAGE:
+        retrieval_results = run_retrieval_with_multistage(gold_queries, top_k)
     else:
         raise ValueError(f"Search strategy non valida: {search_strategy}")
     
@@ -925,12 +1086,46 @@ def run_test_with_your_pipeline(
     )
     
     print_test_result(test_result)
+
+    # Per strategia multistage: stampa e salva statistiche tool selection
+    if search_strategy == SearchStrategy.MULTISTAGE:
+        tool_stats = aggregate_tool_selection_stats(retrieval_results)
+        print_tool_selection_stats(tool_stats)
+        # Aggiunge le stats alla configurazione del test result per averle nel JSON
+        test_result.configuration["tool_selection_stats"] = tool_stats
+
     save_test_result(test_result, results_dir)
     
     return test_result
 
 
 # ==================== ESEMPI DI TEST ====================
+
+def print_tool_selection_stats(stats: Dict):
+    """Stampa le statistiche di tool selection per la strategia MULTISTAGE."""
+
+    if not stats:
+        return
+
+    print("\n" + "="*70)
+    print("📊 STATISTICHE TOOL SELECTION (Multi-stage)")
+    print("="*70)
+    print(f"\n  Totale query analizzate : {stats['total_queries']}")
+    print(f"\n  Semantic only           : {stats['semantic_only_count']:>3} query  ({stats['pct_semantic_only']:>5.1f}%)")
+    print(f"  Keyword only            : {stats['keyword_only_count']:>3} query  ({stats['pct_keyword_only']:>5.1f}%)")
+    print(f"  Entrambi (≈ hybrid)     : {stats['both_count']:>3} query  ({stats['pct_both']:>5.1f}%)")
+    print(f"  Nessuna ricerca         : {stats['none_count']:>3} query  ({stats['pct_none']:>5.1f}%)")
+    print(f"\n  → Risparmio vs. hybrid fisso: {stats['pct_avoided_hybrid']:.1f}% delle query")
+    print(f"    ha evitato di eseguire entrambi i retriever\n")
+
+    print("  Dettaglio per query:")
+    print(f"  {'Query ID':<12} {'Mode':<16} {'Reason'}")
+    print("  " + "-"*66)
+    for d in stats.get("per_query_decisions", []):
+        reason_short = d['reason'][:45] + "..." if len(d['reason']) > 45 else d['reason']
+        print(f"  {d['query_id']:<12} {d['mode']:<16} {reason_short}")
+    print("="*70)
+
 
 # Test con SOLO semantic search (vector similarity)
 def esempio_test_semantic_search():
@@ -973,8 +1168,8 @@ def esempio_test_hybrid_search():
     configuration = {
         "name": "Test Hybrid Search",
         "search_strategy": "hybrid",
-        "semantic_weight": 0.7,
-        "keyword_weight": 0.3,
+        "semantic_weight": 0.5,
+        "keyword_weight": 0.5,
         "embedding_model": EMBEDDING_MODEL_1,
         "llm_model": "gpt-4.1",
         "top_k": 10,
@@ -987,6 +1182,25 @@ def esempio_test_hybrid_search():
         search_strategy=SearchStrategy.HYBRID
     )
 
+# Test con pipeline MULTI-STAGE (tool selection adattivo)
+def esempio_test_multistage():
+
+    configuration = {
+        "name": "Test Multi-stage (adattivo)",
+        "search_strategy": "multistage",
+        "embedding_model": EMBEDDING_MODEL_1,
+        "llm_model": "gpt-4.1",
+        "top_k": 10,
+        "note": "Tool selection adattivo via LLM + deduplicazione con merge sorgenti"
+    }
+
+    return run_test_with_your_pipeline(
+        gold_dataset_path=GOLD_DATASET_PATH,
+        configuration=configuration,
+        search_strategy=SearchStrategy.MULTISTAGE
+    )
+
+
 # Confronto diretto delle 3 strategie di search
 def esempio_confronto_strategie():
 
@@ -997,16 +1211,20 @@ def esempio_confronto_strategie():
     results = []
     
     # Test 1: Semantic
-    print("\n[TEST 1/3] Semantic Search...")
+    print("\n[TEST 1/4] Semantic Search...")
     results.append(esempio_test_semantic_search())
     
     # Test 2: Keyword
-    print("\n[TEST 2/3] Keyword Search (BM25)...")
+    print("\n[TEST 2/4] Keyword Search (BM25)...")
     results.append(esempio_test_keyword_search())
     
     # Test 3: Hybrid
-    print("\n[TEST 3/3] Hybrid Search...")
+    print("\n[TEST 3/4] Hybrid Search...")
     results.append(esempio_test_hybrid_search())
+
+    # Test 4: Multi-stage
+    print("\n[TEST 4/4] Multi-stage (adattivo)...")
+    results.append(esempio_test_multistage())
     
     compare_test_results(results)
 
@@ -1025,9 +1243,10 @@ def main():
     print("1. Semantic Search (vector similarity)")
     print("2. Keyword Search (BM25)")
     print("3. Hybrid Search (semantic + keyword)")
-    print("4. Confronto tutte le strategie")
+    print("4. Multi-stage (tool selection adattivo)")
+    print("5. Confronto tutte le strategie")
     
-    choice = input("\nSelezione (1-4): ").strip()
+    choice = input("\nSelezione (1-5): ").strip()
     
     if choice == "1":
         esempio_test_semantic_search()
@@ -1036,6 +1255,8 @@ def main():
     elif choice == "3":
         esempio_test_hybrid_search()
     elif choice == "4":
+        esempio_test_multistage()
+    elif choice == "5":
         esempio_confronto_strategie()
     else:
         print("Selezione non valida")

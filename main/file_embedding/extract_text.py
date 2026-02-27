@@ -63,11 +63,11 @@ def extract_text_from_varbinary(file_data, extension, numero, reader):
 
             doc = Document(tmp_path)
 
-            # --- Testo nativo ---
+            # Estrazione testo nativo
             for p in doc.paragraphs:
                 full_text += p.text + "\n"
 
-            # --- OCR su immagini embedded ---
+            # OCR su immagini embedded
             for rel in doc.part.rels.values():
                 target_ref = getattr(rel, "target_ref", "")
 
