@@ -1,30 +1,13 @@
 """
-PIPELINE DI VALUTAZIONE SISTEMA RAG
-====================================
+PIPELINE UNIFICATA DI VALUTAZIONE SISTEMA RAG
+==============================================
 
-Valutazione quantitativa tramite ablation study sequenziale.
-Varia una dimensione per volta rispetto alla BASELINE_CONFIG:
-  Senza re-indicizzazione (eseguibili insieme, sessione 1):
-  A) Strategia search   — multistage | hybrid | semantic | keyword
-  B) Modello LLM        — gpt-4.1 | gpt-5
-  C) Top-k              — 10 | 5 | 15
-
-  Con re-indicizzazione (sessioni separate):
-  D) Tipo chunking      — recursive_custom_1024 | fixed_512 | recursive_standard_1024
-  E) Dimensione chunk   — 1024/overlap150 | 512/overlap100
-  F) Modello embedding  — ada-002 | text-embedding-3-large
-
-Uso da terminale:
-  python evaluation_pipeline.py                        # ablation completo A-F
-  python evaluation_pipeline.py -d A B C               # solo sessione 1 (no re-indicizzazione)
-  python evaluation_pipeline.py -d D E                 # sessione 2 (fixed_512)
-  python evaluation_pipeline.py --smoke-test            # smoke test multistage
-  python evaluation_pipeline.py --smoke-test semantic   # smoke test strategia specifica
-
-Uso da codice:
-  from evaluation_pipeline import run_ablation_study, run_smoke_test
-  run_ablation_study(dimensions=["A", "B", "C"])
-  run_smoke_test(strategy=SearchStrategy.MULTISTAGE)
+Pipeline completa per la valutazione quantitativa di sistemi RAG con:
+- Integrazione diretta con il sistema RAG esistente (search.py, llm.py)
+- Metriche di retrieval (Precision@k, Recall@k standard e normalizzata, LLM-as-judge)
+- Metriche di generation (Faithfulness, Answer Relevancy, Semantic Similarity)
+- Supporto per diverse strategie: Semantic, Keyword (BM25), Hybrid, Multi-stage
+- Supporto query negative: no_answer, correction, clarification
 """
 
 import os
@@ -105,7 +88,7 @@ class EvaluationQuery:
     query_id:           str
     query_text:         str
     relevant_chunk_ids: List[str]
-    relevant_doc_ids:   List[str]           = field(default_factory=list)  # non usato in valutazione (legacy, mantenuto per compatibilità col dataset)
+    relevant_doc_ids:   List[str]           = field(default_factory=list)
     relevant_spans:     List[str]           = field(default_factory=list)
     reference_answer:   Optional[str]       = None
     # Campi specifici query negative (None = query positiva)
@@ -199,6 +182,7 @@ def load_gold_dataset(filepath: str) -> List[EvaluationQuery]:
     print(f"  Dataset caricato: {len(queries)} query totali ({positive} positive, {negative} negative)")
     return queries
 
+
 # ==================== METRICHE DI RETRIEVAL ====================
 
 def calculate_precision_at_k(
@@ -248,6 +232,13 @@ def _normalize_whitespace(text: str) -> str:
 
     Collassa qualsiasi sequenza di caratteri whitespace (spazi, tab, newline,
     carriage return, spazi unificatori Unicode) in un singolo spazio.
+    Questo gestisce le differenze di formattazione introdotte dalla pipeline
+    DOCX → OCR → DB, dove lo stesso testo può avere 1, 4 o 8 spazi, tab,
+    o combinazioni miste.
+
+    Nota: si perde l'informazione sulla struttura a paragrafi, ma per il
+    confronto di copertura questo è accettabile — ci interessa solo se le
+    parole rilevanti sono presenti, non come sono disposte.
     """
     import re
     return re.sub(r'\s+', ' ', text).strip()
@@ -327,6 +318,7 @@ def calculate_span_recall_at_k(
     )
     return covered / len(relevant_spans)
 
+
 def evaluate_chunk_relevance_with_llm(
     query:      str,
     chunk_text: str,
@@ -367,16 +359,11 @@ Voto: <0, 1 o 2>"""
             max_tokens=80
         )
         text = response.choices[0].message.content.strip()
+        # Estrae il voto dall'ultima riga
         for line in reversed(text.splitlines()):
             if line.startswith("Voto:"):
-                raw = line.split(":")[1].strip()
-                if raw in ("0", "1", "2"):
-                    return int(raw) / 2.0
-        # Fallback: cerca il primo digit 0/1/2 nell'intera risposta
-        import re
-        match = re.search(r'\b([012])\b', text)
-        if match:
-            return int(match.group(1)) / 2.0
+                score = int(line.split(":")[1].strip())
+                return max(0.0, min(1.0, score / 2.0))  # normalizza a [0,1]
         return 0.0
     except Exception as e:
         print(f"  Errore valutazione LLM chunk relevance: {e}")
@@ -460,36 +447,8 @@ def evaluate_retrieval_for_query(
 
     return metrics
 
+
 # ==================== METRICHE DI GENERATION (QUERY POSITIVE) ====================
-
-def _strip_markdown(text: str) -> str:
-    """
-    Rimuove la formattazione markdown da un testo prima di passarlo al valutatore.
-    Elimina header (#), bold (**), italic (*), bullets, tabelle e blocchi codice.
-
-    Caso speciale: se l'intera risposta è wrappata in un fence ```markdown ... ```
-    (comportamento introdotto da alcuni prompt LLM), i delimitatori vengono rimossi
-    preservando il contenuto interno invece di cancellarlo.
-    """
-    import re
-
-    # Rimozione fence esterno se wrappa l'intera risposta
-    # Es: ```markdown\n<contenuto>\n``` → <contenuto>
-    text = re.sub(r'^```[a-zA-Z]*\n', '', text.strip())
-    if text.endswith('```'):
-        text = text[:-3].rstrip()
-
-    # Blocchi codice interni: rimuove solo i delimitatori, preserva il contenuto
-    text = re.sub(r'```[a-zA-Z]*\n?', '', text)
-    text = re.sub(r'`[^`]+`', lambda m: m.group()[1:-1], text)  # inline code
-
-    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)   # header
-    text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)       # bold/italic
-    text = re.sub(r'^\s*[-*+]\s+', '', text, flags=re.MULTILINE) # bullets
-    text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE) # numbered list
-    text = re.sub(r'\|[^\n]+\|', '', text)                      # tabelle
-    text = re.sub(r'\n{3,}', '\n\n', text)                      # newline multipli
-    return text.strip()
 
 def _extract_atomic_claims(
     generated_answer: str,
@@ -500,93 +459,35 @@ def _extract_atomic_claims(
     Decompone la risposta generata in una lista di claim atomici verificabili
     individualmente. Un claim atomico è una singola proposizione fattuale che
     può essere confermata o smentita indipendentemente dalle altre.
-
-    Il testo viene prima stripped del markdown per ridurre il rumore di
-    formattazione. Se supera CHUNK_CHARS caratteri, viene spezzato in chunk
-    sovrapposti ed elaborato separatamente — i claim vengono poi deduplicati
-    per similarità stringa. Questo evita il troncamento dell'output JSON che
-    causava "Unterminated string" con max_tokens insufficienti.
     """
-    CHUNK_CHARS = 2500   # ~600 token: lascia margine per output JSON a max_tokens=800
-    OVERLAP_CHARS = 200  # sovrapposizione tra chunk per non perdere claim a cavallo
+    prompt = f"""Sei un assistente specializzato nell'analisi di testi tecnici.
 
-    plain_text = _strip_markdown(generated_answer)
+Dato il seguente testo, estraine tutti i claim fattuali atomici — cioè le singole
+affermazioni di fatto che possono essere verificate indipendentemente.
+Ignora frasi introduttive, congiunzioni e parti non fattuali.
 
-    # Se il testo è breve, estrazione diretta
-    if len(plain_text) <= CHUNK_CHARS:
-        return _extract_claims_from_chunk(plain_text, client, model)
-
-    # Altrimenti spezza in chunk sovrapposti ed estrai da ciascuno
-    all_claims: List[str] = []
-    start = 0
-    while start < len(plain_text):
-        chunk = plain_text[start:start + CHUNK_CHARS]
-        chunk_claims = _extract_claims_from_chunk(chunk, client, model)
-        all_claims.extend(chunk_claims)
-        start += CHUNK_CHARS - OVERLAP_CHARS
-
-    # Deduplicazione semplice: rimuove duplicati esatti e quasi-duplicati
-    # (stessa stringa con differenze minime di punteggiatura/capitalizzazione)
-    seen: List[str] = []
-    for claim in all_claims:
-        normalized = claim.lower().strip().rstrip('.')
-        if not any(normalized == s.lower().strip().rstrip('.') for s in seen):
-            seen.append(claim)
-    return seen
-
-def _extract_claims_from_chunk(
-    text:   str,
-    client: AzureOpenAI,
-    model:  str
-) -> List[str]:
-    """Estrae claim atomici da un singolo blocco di testo plain."""
-    system_prompt = (
-        "Sei un assistente specializzato nell'analisi di testi tecnici in italiano. "
-        "Il tuo compito è identificare le affermazioni fattuali presenti in un testo, "
-        "separando ogni fatto verificabile in un elemento distinto della lista."
-    )
-    user_prompt = f"""Analizza il testo seguente e produci una lista delle affermazioni fattuali in esso contenute.
-
-Ogni elemento della lista deve essere una singola proposizione verificabile (un fatto specifico, un dato, un riferimento).
-Le frasi introduttive, le congiunzioni e le valutazioni soggettive non sono affermazioni fattuali.
-
-Testo da analizzare:
+Testo:
 \"\"\"
-{text}
+{generated_answer}
 \"\"\"
 
-Formato di risposta: lista JSON di stringhe. Esempio:
+Rispondi SOLO con una lista JSON di stringhe, una per claim. Esempio:
 ["L'email del cliente è info@esempio.com", "Il referente è Mario Rossi"]
 
-Se il testo non contiene affermazioni fattuali verificabili, scrivi: []"""
+Se il testo non contiene claim fattuali verificabili (es. risposta di assenza info),
+rispondi con una lista vuota: []"""
 
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=800
+            max_tokens=400
         )
-        text_resp = response.choices[0].message.content.strip()
-        text_resp = text_resp.replace("```json", "").replace("```", "").strip()
-
-        # Recupero se JSON troncato: trova l'ultima stringa completa e chiude la lista
-        try:
-            claims = json.loads(text_resp)
-        except json.JSONDecodeError:
-            last_quote = text_resp.rfind('"')
-            if last_quote > 0:
-                truncated = text_resp[:last_quote + 1].rstrip().rstrip(',')
-                try:
-                    claims = json.loads(truncated + ']')
-                except json.JSONDecodeError:
-                    return []
-            else:
-                return []
-
+        text = response.choices[0].message.content.strip()
+        # Rimuove eventuali backtick markdown prima del parse
+        text = text.replace("```json", "").replace("```", "").strip()
+        claims = json.loads(text)
         if isinstance(claims, list):
             return [str(c) for c in claims]
         return []
@@ -604,34 +505,28 @@ def _verify_single_claim(
     Verifica se un singolo claim atomico è supportato dal contesto.
     Ritorna 1.0 se supportato, 0.5 se parzialmente, 0.0 se non supportato.
     """
-    system_prompt = (
-        "Sei un valutatore esperto di sistemi RAG. "
-        "Il tuo compito è stabilire se una affermazione risulta confermata "
-        "da un testo di riferimento."
-    )
-    user_prompt = f"""Testo di riferimento (estratto dai documenti recuperati):
+    prompt = f"""Sei un valutatore esperto di sistemi RAG.
+
+Contesto (estratto dai documenti):
 \"\"\"
 {context_text}
 \"\"\"
 
-Affermazione da valutare: "{claim}"
+Claim da verificare: "{claim}"
 
-Quanto è supportata questa affermazione dal testo di riferimento?
+Il contesto supporta questo claim?
 
-Valori possibili:
-- SUPPORTATO      il testo conferma esplicitamente l'affermazione
-- PARZIALE        il testo è correlato ma non la conferma in modo diretto
-- NON_SUPPORTATO  l'affermazione non è presente o è in contrasto con il testo
+Rispondi SOLO con uno di questi valori:
+- SUPPORTATO   (il contesto conferma esplicitamente il claim)
+- PARZIALE     (il contesto è correlato ma non conferma esplicitamente)
+- NON_SUPPORTATO (il claim non è presente o è contraddetto dal contesto)
 
 Risposta:"""
 
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
             max_tokens=10
         )
@@ -654,29 +549,23 @@ def _faithfulness_rubric_fallback(
     Valutazione di fallback con rubrica discreta 0/1/2 quando l'estrazione
     dei claim atomici non produce risultati (es. risposta troppo breve).
     """
-    import re
     context_text = "\n\n".join(context_chunks)
-    system_prompt = (
-        "Sei un valutatore esperto di sistemi RAG. "
-        "Il tuo compito è valutare quanto le informazioni contenute in una risposta "
-        "siano supportate da un testo di riferimento."
-    )
-    user_prompt = f"""Testo di riferimento:
+    prompt = f"""Sei un valutatore esperto di sistemi RAG.
+
+Contesto:
 \"\"\"
 {context_text}
 \"\"\"
 
-Risposta da valutare:
+Risposta generata:
 \"\"\"
 {generated_answer}
 \"\"\"
 
-Quanto è fedele la risposta al testo di riferimento?
-
 Rubrica:
-- 0 = La risposta contiene informazioni assenti nel testo di riferimento
-- 1 = La risposta è parzialmente fedele: alcune informazioni sono nel testo, altre no
-- 2 = La risposta è completamente fedele: ogni informazione è supportata dal testo
+- 0 = La risposta contiene informazioni non presenti nel contesto (allucinazioni)
+- 1 = La risposta è parzialmente fedele: alcune informazioni sono nel contesto, altre no
+- 2 = La risposta è completamente fedele: ogni informazione è supportata dal contesto
 
 Ragionamento: <1-2 frasi>
 Voto: <0, 1 o 2>"""
@@ -684,22 +573,15 @@ Voto: <0, 1 o 2>"""
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
             max_tokens=80
         )
         text = response.choices[0].message.content.strip()
         for line in reversed(text.splitlines()):
             if line.startswith("Voto:"):
-                raw = line.split(":")[1].strip()
-                if raw in ("0", "1", "2"):
-                    return int(raw) / 2.0
-        match = re.search(r'\b([012])\b', text)
-        if match:
-            return int(match.group(1)) / 2.0
+                score = int(line.split(":")[1].strip())
+                return max(0.0, min(1.0, score / 2.0))
         return 0.0
     except Exception as e:
         print(f"  Errore fallback faithfulness: {e}")
@@ -749,29 +631,6 @@ def evaluate_faithfulness_with_llm(
 
     return faith_score, len(claims), n_supported
 
-def _strip_answer_for_relevancy(text: str) -> str:
-    """
-    Prepara la risposta generata per la valutazione di answer_relevancy:
-    1. Rimuove la sezione 'Documenti di riferimento' (non è parte della risposta
-       ma della citazione delle fonti, non deve influenzare il giudizio).
-    2. Rimuove la formattazione markdown residua.
-    """
-    import re
-    # Rimuove sezione documenti — cerca la prima riga numerata "N. RI: [..."
-    # oppure gli header espliciti tipo "### Documenti di riferimento"
-    patterns = [
-        r'\n---\n+#{1,4}\s*Documenti di riferimento.*',
-        r'\n#{1,4}\s*Documenti di riferimento.*',
-        r'\n---\n+\*\*Documenti[^*]*\*\*.*',
-        r'\n\d+\. RI: \[.*',
-    ]
-    for p in patterns:
-        m = re.search(p, text, re.DOTALL | re.IGNORECASE)
-        if m:
-            text = text[:m.start()]
-            break
-    return _strip_markdown(text).strip()
-
 def evaluate_answer_relevancy_with_llm(
     query:            str,
     generated_answer: str,
@@ -780,84 +639,41 @@ def evaluate_answer_relevancy_with_llm(
 ) -> float:
     """
     Valuta la pertinenza della risposta rispetto alla query con rubrica discreta.
-
-    Prima della valutazione la risposta viene pre-processata:
-    - rimossa la sezione 'Documenti di riferimento' (citazioni delle fonti)
-    - rimossa la formattazione markdown
-    Questo evita che il giudice polarizzi su risposte strutturate lunghe,
-    valutando solo il contenuto informativo effettivo.
-
-    Rubrica:
-    - 0 = La risposta non affronta la domanda (fuori tema o rifiuto)
-    - 1 = La risposta affronta la domanda ma in modo incompleto: almeno un
-          aspetto esplicitamente richiesto dalla query è assente o trattato
-          solo in modo marginale
-    - 2 = La risposta affronta direttamente tutti gli aspetti della domanda
+    Si valuta solo la qualità della risposta generata per le query positive —
+    le query negative hanno un sistema di valutazione dedicato (evaluate_negative_query).
     """
-    import re
-    clean_answer = _strip_answer_for_relevancy(generated_answer)
+    prompt = f"""Sei un valutatore esperto di sistemi RAG.
 
-    system_prompt = (
-        "Sei un valutatore esperto di sistemi RAG specializzato in documentazione "
-        "tecnica ERP. Il tuo compito è valutare quanto una risposta copre gli "
-        "aspetti richiesti dalla domanda dell'utente."
-    )
-    user_prompt = f"""Valuta la pertinenza della risposta rispetto alla query.
+Query utente: "{query}"
 
-Rubrica:
-- 0 = La risposta non affronta la domanda (fuori tema, rifiuto, o risposta generica senza contenuto specifico)
-- 1 = La risposta affronta la domanda ma in modo incompleto: almeno un aspetto esplicitamente richiesto è assente o trattato solo superficialmente
-- 2 = La risposta affronta direttamente e completamente tutti gli aspetti della domanda
-
-Esempi calibrati:
-
-Query: "Qual è l'email di GMR Enlights e chi è il referente?"
-Risposta: "L'email è info@gmrenlights.com."
-Ragionamento: La risposta fornisce l'email ma non risponde alla domanda sul referente, che era esplicitamente richiesto.
-Voto: 1
-
-Query: "Come funziona il calcolo delle spese di trasporto per Logos SPA?"
-Risposta: "In SAM ERP2 esistono vari plugin per personalizzare i documenti di vendita."
-Ragionamento: La risposta non affronta la logica specifica del calcolo delle spese di trasporto per Logos SPA.
-Voto: 0
-
-Query: "Come si configura la periodicità di liquidazione degli interessi per conto banca?"
-Risposta: "La periodicità si configura per ogni conto banca con diverse opzioni: mensile (giorno e periodo di riferimento), trimestrale (quattro date), semestrale (due date con relativi periodi). Ogni configurazione determina quando il sistema calcola e registra gli interessi."
-Ragionamento: La risposta copre direttamente la configurazione della periodicità con tutte le opzioni richieste.
-Voto: 2
-
----
-
-Query: "{query}"
-
-Risposta da valutare:
+Risposta generata:
 \"\"\"
-{clean_answer}
+{generated_answer}
 \"\"\"
 
-Ragionamento: <1-2 frasi che identificano quali aspetti della query sono coperti e quali mancano>
+Valuta la pertinenza della risposta alla query seguendo questa rubrica:
+- 0 = La risposta non risponde alla domanda posta
+- 1 = La risposta risponde parzialmente o in modo indiretto alla domanda
+- 2 = La risposta risponde direttamente e completamente alla domanda
+
+Ragiona brevemente (1-2 frasi), poi emetti il voto.
+
+Formato risposta (rispetta esattamente):
+Ragionamento: <testo>
 Voto: <0, 1 o 2>"""
 
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=120
+            max_tokens=80
         )
         text = response.choices[0].message.content.strip()
         for line in reversed(text.splitlines()):
             if line.startswith("Voto:"):
-                raw = line.split(":")[1].strip()
-                if raw in ("0", "1", "2"):
-                    return int(raw) / 2.0
-        import re as _re
-        match = _re.search(r'\b([012])\b', text)
-        if match:
-            return int(match.group(1)) / 2.0
+                score = int(line.split(":")[1].strip())
+                return max(0.0, min(1.0, score / 2.0))
         return 0.0
     except Exception as e:
         print(f"  Errore valutazione answer relevancy: {e}")
@@ -882,7 +698,7 @@ def evaluate_generation_for_query(
     generation_result: GenerationResult,
     client:            AzureOpenAI,
     llm_model:         str = JUDGE_MODEL,
-    embedding_model:   str = "text-embedding-ada-002"
+    embedding_model:   str = "text-embedding-3-large"
 ) -> Dict[str, float]:
 
     metrics = {}
@@ -913,6 +729,7 @@ def evaluate_generation_for_query(
 
     return metrics
 
+
 # ==================== VALUTAZIONE QUERY NEGATIVE ====================
 
 def evaluate_no_answer_behavior(
@@ -927,56 +744,33 @@ def evaluate_no_answer_behavior(
 
     Ritorna: (score 0.0/1.0, label, reasoning)
     """
-    system_prompt = (
-        "Sei un valutatore esperto di sistemi RAG specializzato in documentazione tecnica ERP. "
-        "Il tuo compito è stabilire se un sistema RAG ha riconosciuto correttamente l'assenza "
-        "di informazioni nel proprio database, invece di rispondere con contenuto non supportato."
-    )
-    user_prompt = f"""La seguente domanda riguarda un'informazione NON presente nel database documentale del sistema.
+    prompt = f"""Sei un valutatore esperto di sistemi RAG.
+
+La seguente domanda riguarda un'informazione NON presente nel database documentale del sistema:
 Query: "{query.query_text}"
 Motivo per cui non dovrebbe rispondere: {query.negative_reason}
 
 Risposta generata dal sistema:
-\"\"\"\n{generated_answer}
-\"\"\"\n
-Rubrica di valutazione:
-- 1 (CORRETTO) = Il sistema ha riconosciuto l'assenza di informazioni. Sono accettabili sia
-  dichiarazioni dirette ("non ho informazioni", "non posso rispondere") sia indirette
-  ("non viene menzionato nei documenti", "non risulta nei dati disponibili").
-  Il sistema può aggiungere contesto generale purché segnali esplicitamente che
-  l'informazione specifica richiesta non è disponibile o non trovata nei documenti.
-- 0 (ERRATO) = Il sistema ha risposto come se disponesse dell'informazione richiesta,
-  senza segnalare l'assenza. Sono ERRATE le risposte che forniscono dati specifici,
-  procedure dettagliate o affermazioni fattuali sulla questione senza alcuna riserva.
+\"\"\"
+{generated_answer}
+\"\"\"
 
-Esempi calibrati:
+Valuta se il sistema ha risposto correttamente seguendo questa rubrica:
+- 0 = Il sistema ha risposto come se avesse le informazioni (allucinazione o risposta generica non supportata)
+- 1 = Il sistema ha esplicitamente dichiarato di non avere informazioni sufficienti per rispondere
 
-Query: "È previsto un limite massimo mensile alle provvigioni per agente?"
-Risposta: "Non viene menzionato alcun limite massimo mensile alle provvigioni nei documenti
-disponibili, né come funzionalità standard né come personalizzazione."
-Ragionamento: La risposta dichiara esplicitamente che l'informazione non è presente nei documenti.
-Voto: 1
+Ragiona brevemente (1-2 frasi), poi emetti il voto.
 
-Query: "Come si configura il calcolo delle spese di trasporto per zona geografica?"
-Risposta: "Il calcolo avviene tramite una personalizzazione specifica che considera il peso
-e la destinazione della merce."
-Ragionamento: La risposta fornisce dettagli come se l'informazione fosse disponibile.
-Voto: 0
-
----
-
-Ragionamento: <1-2 frasi>
+Formato risposta (rispetta esattamente):
+Ragionamento: <testo>
 Voto: <0 o 1>"""
 
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_prompt}
-            ],
+            messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
-            max_tokens=150
+            max_tokens=100
         )
         text = response.choices[0].message.content.strip()
         reasoning = ""
@@ -1159,6 +953,7 @@ def aggregate_negative_metrics(results: List[NegativeEvaluationResult]) -> Dict[
     metrics["count_total"]        = len(all_scores)
     return metrics
 
+
 # ==================== AGGREGAZIONE METRICHE POSITIVE ====================
 
 def aggregate_retrieval_metrics(
@@ -1221,6 +1016,7 @@ def aggregate_generation_metrics(
         )
 
     return aggregated
+
 
 # ==================== INTEGRAZIONE CON SISTEMA RAG ====================
 
@@ -1459,6 +1255,7 @@ def aggregate_tool_selection_stats(retrieval_results: List[RetrievalResult]) -> 
         ]
     }
 
+
 # ==================== GENERATION ====================
 
 def run_generation_with_llm(
@@ -1527,6 +1324,7 @@ def run_generation_with_llm(
 
     print(f"\n{'='*70}\n")
     return generation_results
+
 
 # ==================== VALUTAZIONE COMPLETA ====================
 
@@ -1622,6 +1420,7 @@ def run_full_evaluation(
         per_query_details     = per_query_details,
         total_evaluation_time = time.time() - start_time
     )
+
 
 # ==================== GESTIONE RISULTATI ====================
 
@@ -1767,6 +1566,7 @@ def run_test_with_your_pipeline(
     save_test_result(test_result, results_dir)
     return test_result
 
+
 # ==================== ESEMPI DI TEST ====================
 
 def print_tool_selection_stats(stats: Dict):
@@ -1790,54 +1590,116 @@ def print_tool_selection_stats(stats: Dict):
         print(f"  {d['query_id']:<12} {d['mode']:<16} {reason_short}")
     print("="*70)
 
+
+def esempio_test_semantic_search():
+    return run_test_with_your_pipeline(
+        gold_dataset_path=GOLD_DATASET_PATH,
+        configuration={
+            "name": "Semantic Search",
+            "search_strategy": "semantic",
+            "embedding_model": EMBEDDING_MODEL_1,
+            "llm_model": "gpt-4.1",
+            "top_k": 10
+        },
+        search_strategy=SearchStrategy.SEMANTIC
+    )
+
+def esempio_test_keyword_search():
+    return run_test_with_your_pipeline(
+        gold_dataset_path=GOLD_DATASET_PATH,
+        configuration={
+            "name": "Keyword Search BM25",
+            "search_strategy": "keyword",
+            "llm_model": "gpt-4.1",
+            "top_k": 10
+        },
+        search_strategy=SearchStrategy.KEYWORD
+    )
+
+def esempio_test_hybrid_search():
+    return run_test_with_your_pipeline(
+        gold_dataset_path=GOLD_DATASET_PATH,
+        configuration={
+            "name": "Hybrid Search (50/50)",
+            "search_strategy": "hybrid",
+            "semantic_weight": 0.5,
+            "embedding_model": EMBEDDING_MODEL_1,
+            "llm_model": "gpt-4.1",
+            "top_k": 10
+        },
+        search_strategy=SearchStrategy.HYBRID
+    )
+
+def esempio_test_multistage():
+    return run_test_with_your_pipeline(
+        gold_dataset_path=GOLD_DATASET_PATH,
+        configuration={
+            "name": "Multi-stage (adattivo)",
+            "search_strategy": "multistage",
+            "embedding_model": EMBEDDING_MODEL_1,
+            "llm_model": "gpt-4.1",
+            "top_k": 10
+        },
+        search_strategy=SearchStrategy.MULTISTAGE
+    )
+
+def esempio_confronto_strategie():
+    print("\n" + "="*70)
+    print("CONFRONTO STRATEGIE DI SEARCH")
+    print("="*70)
+    results = []
+    print("\n[TEST 1/4] Semantic Search...")
+    results.append(esempio_test_semantic_search())
+    print("\n[TEST 2/4] Keyword Search (BM25)...")
+    results.append(esempio_test_keyword_search())
+    print("\n[TEST 3/4] Hybrid Search...")
+    results.append(esempio_test_hybrid_search())
+    print("\n[TEST 4/4] Multi-stage (adattivo)...")
+    results.append(esempio_test_multistage())
+    compare_test_results(results)
+
+
 # ==================== ABLATION STUDY ====================
 
 def run_ablation_study(
     gold_dataset_path: str       = GOLD_DATASET_PATH,
     results_dir:       str       = "evaluation_results/ablation",
-    dimensions:        List[str] = None,
-    variant:           str       = None
+    dimensions:        List[str] = None
 ) -> Dict[str, TestResult]:
     """
     Ablation study sequenziale: parte dalla BASELINE_CONFIG e varia
     una dimensione per volta, mantenendo tutto il resto fisso.
 
     Dimensioni disponibili:
-      — Senza re-indicizzazione del DB (eseguibili in una sola sessione) —
       A) Strategia di search   : multistage (baseline) | hybrid | semantic | keyword
-      B) Modello LLM generativo: gpt-4.1 (baseline) | gpt-5
-      C) Top-k documenti       : 5 (baseline) | 10 | 15
+      B) Tipo di chunking       : recursive_custom_1024 (baseline) | fixed_512 | recursive_standard_1024
+      C) Dimensione chunk       : 1024/overlap150 (baseline) | 512/overlap100
+      D) Modello embedding      : ada-002 (baseline) | text-embedding-3-large
+      E) Modello LLM generativo : gpt-4.1 (baseline) | gpt-5
+      F) Top-k documenti        : 10 (baseline) | 8 | 15
 
-      — Con re-indicizzazione del DB (una variante per sessione) —
-      D) Tipo di chunking      : D1_recursive_custom (baseline) | D2_fixed_size | D3_recursive_standard
-      E) Dimensione chunk      : E1_chunk1024_overlap150 (baseline) | E2_chunk512_overlap100
-      F) Modello embedding     : F1_ada002 (baseline) | F2_3large
+    Parametri:
+      dimensions: lista opzionale di lettere per eseguire solo i gruppi
+                  specificati. Se None, esegue tutto. Esempi:
+                    run_ablation_study(dimensions=["A", "E", "F"])
+                    run_ablation_study(dimensions=["B", "C"])
+                    run_ablation_study(dimensions=["D"])
 
-    Per le dimensioni D, E, F è OBBLIGATORIO specificare --variant, poiché ogni
-    variante richiede un DB indicizzato con parametri diversi.
+                  Utile per sessioni separate in base al DB attivo:
+                    - DB baseline (recursive custom 1024, ada-002) : ["A", "E", "F"]
+                    - DB re-indicizzato con fixed 512              : ["B", "C"]
+                    - DB re-indicizzato con recursive standard     : ["B"]  (solo B3)
+                    - DB re-indicizzato con embedding-3-large      : ["D"]
+
+    Per B e C la metrica primaria di confronto è span_recall, che è invariante
+    al chunking perché lavora sul testo originale invece che sugli ID dei chunk.
     """
     active = set(d.upper() for d in dimensions) if dimensions else None
-
-    # Validazione: D/E/F richiedono --variant esplicito
-    db_dependent = {"D", "E", "F"}
-    if active and (active & db_dependent):
-        if not variant:
-            dims_str = ", ".join(sorted(active & db_dependent))
-            print(
-                f"\nERRORE: le dimensioni {dims_str} richiedono re-indicizzazione del DB.\n"
-                f"Specifica la variante da eseguire con --variant.\n"
-                f"Varianti disponibili:\n"
-                f"  D: D1_recursive_custom (baseline) | D2_fixed_size | D3_recursive_standard\n"
-                f"  E: E1_chunk1024_overlap150 (baseline) | E2_chunk512_overlap100\n"
-                f"  F: F1_ada002 (baseline) | F2_3large\n"
-                f"Esempio: python evaluation_pipeline.py -d D --variant D2_fixed_size_512"
-            )
-            return {}
 
     results: Dict[str, TestResult] = {}
     all_configs = []
 
-    # ── A: Strategia di search (no re-indicizzazione) ────────────────────────
+    # ── A: Strategia di search ──────────────────────────────────────────
     if active is None or "A" in active:
         for strategy, name in [
             (SearchStrategy.MULTISTAGE, "A1_multistage_baseline"),
@@ -1848,68 +1710,56 @@ def run_ablation_study(
             cfg = {**BASELINE_CONFIG, "name": name, "search_strategy": strategy}
             all_configs.append(("A", cfg, strategy))
 
-    # ── B: Modello LLM generativo (no re-indicizzazione) ─────────────────────
+    # ── B: Tipo di chunking (doc_recall abilitato) ───────────────────────
     if active is None or "B" in active:
-        for llm_model, name in [
-            ("gpt-4.1", "B1_gpt41_baseline"),
-            ("gpt-5",   "B2_gpt5"),
+        for chunking, name in [
+            ("recursive_custom_1024",   "B1_recursive_custom_baseline"),
+            ("fixed_512",               "B2_fixed_size_512"),
+            ("recursive_standard_1024", "B3_recursive_standard_1024"),
         ]:
-            cfg = {**BASELINE_CONFIG, "name": name, "llm_model": llm_model}
+            cfg = {**BASELINE_CONFIG, "name": name, "chunking": chunking}
             all_configs.append(("B", cfg, BASELINE_CONFIG["search_strategy"]))
 
-    # ── C: Top-k (no re-indicizzazione) ──────────────────────────────────────
+    # ── C: Dimensione chunk (doc_recall abilitato) ────────────────────────
     if active is None or "C" in active:
-        for top_k, name in [
-            (5,  "C1_topk5_baseline"),
-            (10, "C2_topk10"),
-            (15, "C3_topk15"),
+        for chunk_size, overlap, name in [
+            (1024, 150, "C1_chunk1024_overlap150_baseline"),
+            (512,  100, "C2_chunk512_overlap100"),
         ]:
-            cfg = {**BASELINE_CONFIG, "name": name, "top_k": top_k}
-            all_configs.append(("C", cfg, BASELINE_CONFIG["search_strategy"]))
-
-    # ── D: Tipo di chunking (richiede re-indicizzazione) ─────────────────────
-    if active is None or "D" in active:
-        d_variants = {
-            "D1_recursive_custom_baseline":   "recursive_custom_1024",
-            "D2_fixed_size_512":              "fixed_512",
-            "D3_recursive_standard_1024":     "recursive_standard_1024",
-        }
-        for name, chunking in d_variants.items():
-            if variant and name != variant:
-                continue
-            cfg = {**BASELINE_CONFIG, "name": name, "chunking": chunking}
-            all_configs.append(("D", cfg, BASELINE_CONFIG["search_strategy"]))
-
-    # ── E: Dimensione chunk (richiede re-indicizzazione) ──────────────────────
-    if active is None or "E" in active:
-        e_variants = {
-            "E1_chunk1024_overlap150 (baseline)": (1024, 150),
-            "E2_chunk512_overlap100":             (512,  100),
-        }
-        for name, (chunk_size, overlap) in e_variants.items():
-            if variant and name != variant:
-                continue
             cfg = {**BASELINE_CONFIG, "name": name,
                    "chunk_size": chunk_size, "chunk_overlap": overlap}
+            all_configs.append(("C", cfg, BASELINE_CONFIG["search_strategy"]))
+
+    # ── D: Modello embedding ─────────────────────────────────────────────
+    if active is None or "D" in active:
+        for emb_model, name in [
+            ("text-embedding-ada-002", "D1_ada002_baseline"),
+            ("text-embedding-3-large", "D2_embedding3large"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "embedding_model": emb_model}
+            all_configs.append(("D", cfg, BASELINE_CONFIG["search_strategy"]))
+
+    # ── E: Modello LLM generativo ────────────────────────────────────────
+    if active is None or "E" in active:
+        for llm_model, name in [
+            ("gpt-4.1", "E1_gpt41_baseline"),
+            ("gpt-5",   "E2_gpt5"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "llm_model": llm_model}
             all_configs.append(("E", cfg, BASELINE_CONFIG["search_strategy"]))
 
-    # ── F: Modello embedding (richiede re-indicizzazione) ─────────────────────
+    # ── F: Top-k ─────────────────────────────────────────────────────────
     if active is None or "F" in active:
-        f_variants = {
-            "F1_ada002_baseline":  "text-embedding-ada-002",
-            "F2_embedding3large":  "text-embedding-3-large",
-        }
-        for name, emb_model in f_variants.items():
-            if variant and name != variant:
-                continue
-            cfg = {**BASELINE_CONFIG, "name": name, "embedding_model": emb_model}
+        for top_k, name in [
+            (10, "F1_topk10_baseline"),
+            (8,  "F2_topk8"),
+            (15, "F3_topk15"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "top_k": top_k}
             all_configs.append(("F", cfg, BASELINE_CONFIG["search_strategy"]))
 
     if not all_configs:
-        if variant:
-            print(f"Variante '{variant}' non trovata nelle dimensioni specificate.")
-        else:
-            print(f"Nessuna dimensione valida tra quelle specificate: {dimensions}")
+        print(f"Nessuna dimensione valida tra quelle specificate: {dimensions}")
         return results
 
     # ── Esecuzione ────────────────────────────────────────────────────────
@@ -1935,84 +1785,29 @@ def run_ablation_study(
     compare_test_results(list(results.values()))
     return results
 
-def run_smoke_test(strategy: str = SearchStrategy.MULTISTAGE) -> TestResult:
-    """
-    Esegue un test rapido su una singola strategia con la configurazione baseline.
-    """
-    config = dict(BASELINE_CONFIG)
-    config["name"] = f"Smoke Test — {strategy}"
-    return run_test_with_your_pipeline(
-        gold_dataset_path = GOLD_DATASET_PATH,
-        configuration     = config,
-        search_strategy   = strategy,
-        results_dir       = "evaluation_results/smoke"
-    )
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser(
-        description="Pipeline di valutazione sistema RAG — Tesi magistrale"
-    )
-    parser.add_argument(
-        "--dimensions", "-d",
-        nargs="+",
-        metavar="DIM",
-        help="Dimensioni ablation da eseguire (es. A E F). Default: tutte (A-F)."
-    )
-    parser.add_argument(
-        "--smoke-test", "-s",
-        metavar="STRATEGY",
-        nargs="?",
-        const="multistage",
-        help="Smoke test rapido invece dell'ablation. "
-             "Strategie: semantic | keyword | hybrid | multistage (default)."
-    )
-    parser.add_argument(
-        "--variant", "-v",
-        metavar="VARIANT",
-        default=None,
-        help=(
-            "Variante specifica da eseguire per dimensioni D/E/F (obbligatorio per queste). "
-            "Es: D2_fixed_size_512 | D3_recursive_standard_1024 | "
-            "E2_chunk512_overlap100 | F2_embedding3large. "
-            "Non ha effetto sulle dimensioni A/B/C."
-        )
-    )
-    parser.add_argument(
-        "--results-dir", "-o",
-        default="evaluation_results/ablation",
-        help="Directory di output per i risultati JSON."
-    )
-    args = parser.parse_args()
+    print("="*70)
+    print("PIPELINE UNIFICATA DI VALUTAZIONE SISTEMA RAG")
+    print("="*70)
+    print("\nScegli il tipo di test:")
+    print("1. Semantic Search (vector similarity)")
+    print("2. Keyword Search (BM25)")
+    print("3. Hybrid Search (semantic + keyword)")
+    print("4. Multi-stage (tool selection adattivo)")
+    print("5. Confronto tutte le strategie")
+    print("6. Ablation study completo")
 
-    print("=" * 70)
-    print("PIPELINE DI VALUTAZIONE SISTEMA RAG")
-    print("=" * 70)
+    choice = input("\nSelezione (1-6): ").strip()
 
-    if args.smoke_test is not None:
-        strategy_map = {
-            "semantic":   SearchStrategy.SEMANTIC,
-            "keyword":    SearchStrategy.KEYWORD,
-            "hybrid":     SearchStrategy.HYBRID,
-            "multistage": SearchStrategy.MULTISTAGE,
-        }
-        strategy = strategy_map.get(args.smoke_test.lower())
-        if strategy is None:
-            print(f"Strategia non valida: {args.smoke_test!r}. "
-                  f"Usa: {', '.join(strategy_map)}")
-            return
-        print(f"\nModalità: smoke test — {args.smoke_test}")
-        run_smoke_test(strategy)
-    else:
-        dims = args.dimensions if args.dimensions else None
-        label = ", ".join(dims) if dims else "A-F (complete)"
-        print(f"\nModalità: ablation study — dimensioni {label}")
-        run_ablation_study(
-            gold_dataset_path = GOLD_DATASET_PATH,
-            results_dir       = args.results_dir,
-            dimensions        = dims,
-            variant           = args.variant
-        )
+    if   choice == "1": esempio_test_semantic_search()
+    elif choice == "2": esempio_test_keyword_search()
+    elif choice == "3": esempio_test_hybrid_search()
+    elif choice == "4": esempio_test_multistage()
+    elif choice == "5": esempio_confronto_strategie()
+    elif choice == "6": run_ablation_study()
+    else:               print("Selezione non valida")
+
 
 if __name__ == "__main__":
     main()

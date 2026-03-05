@@ -1,17 +1,30 @@
 """
-PIPELINE UNIFICATA DI VALUTAZIONE SISTEMA RAG
-==============================================
+PIPELINE DI VALUTAZIONE SISTEMA RAG
+====================================
 
-Pipeline completa per la valutazione quantitativa di sistemi RAG con:
-- Integrazione diretta con il sistema RAG esistente (search.py, llm.py)
-- Metriche di retrieval (Precision@k, Recall@k standard e normalizzata, LLM-as-judge)
-- Metriche di generation (Faithfulness, Answer Relevancy, Semantic Similarity)
-- Supporto per diverse strategie: Semantic, Keyword (BM25), Hybrid, Multi-stage
-- Supporto query negative: no_answer, correction, clarification
+Valutazione quantitativa tramite ablation study sequenziale.
+Varia una dimensione per volta rispetto alla BASELINE_CONFIG:
+  Senza re-indicizzazione (eseguibili insieme, sessione 1):
+  A) Strategia search   — multistage | hybrid | semantic | keyword
+  B) Modello LLM        — gpt-4.1 | gpt-5
+  C) Top-k              — 10 | 5 | 15
 
-Tesi Magistrale in Ingegneria Informatica e dell'IA
-Autore: Andrea Cantelli
-Data: Gennaio 2026
+  Con re-indicizzazione (sessioni separate):
+  D) Tipo chunking      — recursive_custom_1024 | fixed_512 | recursive_standard_1024
+  E) Dimensione chunk   — 1024/overlap150 | 512/overlap100
+  F) Modello embedding  — ada-002 | text-embedding-3-large
+
+Uso da terminale:
+  python evaluation_pipeline.py                        # ablation completo A-F
+  python evaluation_pipeline.py -d A B C               # solo sessione 1 (no re-indicizzazione)
+  python evaluation_pipeline.py -d D E                 # sessione 2 (fixed_512)
+  python evaluation_pipeline.py --smoke-test            # smoke test multistage
+  python evaluation_pipeline.py --smoke-test semantic   # smoke test strategia specifica
+
+Uso da codice:
+  from evaluation_pipeline import run_ablation_study, run_smoke_test
+  run_ablation_study(dimensions=["A", "B", "C"])
+  run_smoke_test(strategy=SearchStrategy.MULTISTAGE)
 """
 
 import os
@@ -20,6 +33,7 @@ import time
 import sys
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass, asdict, field
+from difflib import SequenceMatcher
 from pathlib import Path
 import numpy as np
 from datetime import datetime
@@ -91,7 +105,8 @@ class EvaluationQuery:
     query_id:           str
     query_text:         str
     relevant_chunk_ids: List[str]
-    relevant_doc_ids:   List[str]           = field(default_factory=list)
+    relevant_doc_ids:   List[str]           = field(default_factory=list)  # non usato in valutazione (legacy, mantenuto per compatibilità col dataset)
+    relevant_spans:     List[str]           = field(default_factory=list)
     reference_answer:   Optional[str]       = None
     # Campi specifici query negative (None = query positiva)
     expected_behavior:  Optional[str]       = None
@@ -101,6 +116,11 @@ class EvaluationQuery:
     def is_negative(self) -> bool:
         return self.expected_behavior is not None
 
+    @property
+    def has_spans(self) -> bool:
+        """True se il dataset è stato migrato al formato span-based."""
+        return len(self.relevant_spans) > 0
+
 @dataclass
 class RetrievalResult:
     """Risultato del retrieval per una query."""
@@ -109,6 +129,7 @@ class RetrievalResult:
     retrieved_chunk_texts: List[str]
     retrieval_time:        float
     tool_decision:         Optional[Dict] = None  # Solo per MULTISTAGE
+    co_retrieval_pct:      Optional[float] = None  # % chunk da entrambi i retriever (solo MULTISTAGE quando both=True)
 
 @dataclass
 class GenerationResult:
@@ -166,6 +187,7 @@ def load_gold_dataset(filepath: str) -> List[EvaluationQuery]:
             query_text         = item['query_text'],
             relevant_chunk_ids = item.get('relevant_chunk_ids', []),
             relevant_doc_ids   = item.get('relevant_doc_ids', []),
+            relevant_spans     = item.get('relevant_spans', []),
             reference_answer   = item.get('reference_answer'),
             expected_behavior  = item.get('expected_behavior'),
             negative_reason    = item.get('negative_reason')
@@ -219,6 +241,101 @@ def calculate_recall_at_k_normalized(
     top_k = retrieved_ids[:k]
     return sum(1 for doc_id in top_k if doc_id in relevant_ids) / min(k, len(relevant_ids))
 
+# ── Metriche span-centriche ───────────────────────────────────────────────────
+
+def _normalize_whitespace(text: str) -> str:
+    """
+    Normalizza whitespace in forma canonica per il confronto span-chunk.
+
+    Collassa qualsiasi sequenza di caratteri whitespace (spazi, tab, newline,
+    carriage return, spazi unificatori Unicode) in un singolo spazio.
+    Questo gestisce le differenze di formattazione introdotte dalla pipeline
+    DOCX → OCR → DB, dove lo stesso testo può avere 1, 4 o 8 spazi, tab,
+    o combinazioni miste.
+
+    Nota: si perde l'informazione sulla struttura a paragrafi, ma per il
+    confronto di copertura questo è accettabile — ci interessa solo se le
+    parole rilevanti sono presenti, non come sono disposte.
+    """
+    import re
+    return re.sub(r'\s+', ' ', text).strip()
+
+def chunk_covers_span(
+    chunk_text: str,
+    span:       str,
+    threshold:  float = 0.7
+) -> bool:
+    """
+    Verifica se un chunk recuperato copre uno span di riferimento.
+
+    Normalizza il whitespace prima del confronto per gestire le differenze
+    di formattazione introdotte dalla pipeline DOCX → OCR → DB
+    (tab vs spazi multipli, newline multipli, ecc.).
+
+    Prima controlla la sottostringa normalizzata (caso più comune).
+    Se fallisce, usa SequenceMatcher sui testi normalizzati con soglia
+    configurabile per gestire piccole differenze residue.
+
+    threshold=0.7 è conservativo: richiede che il 70% del testo dello span
+    sia comune con il chunk.
+    """
+    span_norm  = _normalize_whitespace(span)
+    chunk_norm = _normalize_whitespace(chunk_text)
+
+    if not span_norm:
+        return False
+
+    # Controllo sottostringa normalizzata
+    if span_norm in chunk_norm:
+        return True
+
+    # Fallback SequenceMatcher su testi normalizzati
+    ratio = SequenceMatcher(None, chunk_norm, span_norm).ratio()
+    return ratio >= threshold
+
+def calculate_span_precision_at_k(
+    retrieved_texts: List[str],
+    relevant_spans:  List[str],
+    k:               int,
+    threshold:       float = 0.7
+) -> float:
+    """
+    P@k span-based = chunk tra i top-k che coprono ≥1 span / k
+
+    Un chunk è "rilevante" se contiene almeno uno degli span di riferimento.
+    """
+    if k == 0 or not retrieved_texts or not relevant_spans:
+        return 0.0
+    top_k = retrieved_texts[:k]
+    relevant_count = sum(
+        1 for chunk in top_k
+        if any(chunk_covers_span(chunk, span, threshold) for span in relevant_spans)
+    )
+    return relevant_count / k
+
+def calculate_span_recall_at_k(
+    retrieved_texts: List[str],
+    relevant_spans:  List[str],
+    k:               int,
+    threshold:       float = 0.7
+) -> float:
+    """
+    R@k span-centrica = span coperti da ≥1 chunk tra i top-k / totale span
+
+    Risponde alla domanda: "quante delle informazioni necessarie per rispondere
+    sono state recuperate?". È invariante al chunking: se due span finiscono
+    nello stesso chunk, vengono entrambi coperti recuperando un solo documento.
+    """
+    if not relevant_spans:
+        return 0.0
+    top_k = retrieved_texts[:k]
+    covered = sum(
+        1 for span in relevant_spans
+        if any(chunk_covers_span(chunk, span, threshold) for chunk in top_k)
+    )
+    return covered / len(relevant_spans)
+
+
 def evaluate_chunk_relevance_with_llm(
     query:      str,
     chunk_text: str,
@@ -259,11 +376,16 @@ Voto: <0, 1 o 2>"""
             max_tokens=80
         )
         text = response.choices[0].message.content.strip()
-        # Estrae il voto dall'ultima riga
         for line in reversed(text.splitlines()):
             if line.startswith("Voto:"):
-                score = int(line.split(":")[1].strip())
-                return max(0.0, min(1.0, score / 2.0))  # normalizza a [0,1]
+                raw = line.split(":")[1].strip()
+                if raw in ("0", "1", "2"):
+                    return int(raw) / 2.0
+        # Fallback: cerca il primo digit 0/1/2 nell'intera risposta
+        import re
+        match = re.search(r'\b([012])\b', text)
+        if match:
+            return int(match.group(1)) / 2.0
         return 0.0
     except Exception as e:
         print(f"  Errore valutazione LLM chunk relevance: {e}")
@@ -283,57 +405,89 @@ def calculate_average_chunk_relevance(
     return float(np.mean(scores))
 
 def evaluate_retrieval_for_query(
-    query:             EvaluationQuery,
-    retrieval_result:  RetrievalResult,
-    client:            AzureOpenAI,
-    k_values:          List[int] = [1, 3, 5, 10],
-    llm_model:         str = JUDGE_MODEL,
-    compute_doc_recall: bool = False
+    query:          EvaluationQuery,
+    retrieval_result: RetrievalResult,
+    client:           AzureOpenAI,
+    k_values:         List[int] = [1, 3, 5, 10],
+    llm_model:        str   = JUDGE_MODEL,
+    span_threshold:   float = 0.7
 ) -> Dict[str, float]:
     """
     Calcola le metriche di retrieval per una singola query positiva.
 
-    compute_doc_recall: se True calcola anche doc_recall_at_k (document-level,
-    indipendente dal chunking). Va abilitato SOLO nell'esperimento di confronto
-    tra configurazioni di chunking diverse, dove i chunk ID cambiano ma il
-    documento di riferimento rimane stabile. Nelle altre comparazioni è ridondante
-    rispetto alla chunk-level recall e viene omesso per chiarezza.
+    Metriche calcolate per ogni k ∈ k_values:
+
+      Chunk-level (usa relevant_chunk_ids — dipende dal chunking attivo):
+        precision_at_k       P@k — chunk rilevanti tra top-k / k
+        recall_at_k_norm     R@k normalizzata — chunk rilevanti tra top-k / min(k, |R|)
+                             Si usa esclusivamente la versione normalizzata perché evita
+                             la penalizzazione strutturale per query con molti rilevanti:
+                             con |R|=11 e k=5 la recall standard non può mai superare 0.45
+                             anche con un retriever perfetto, distorcendo le medie aggregate.
+
+      Span-level (usa relevant_spans — invariante al chunking):
+        span_precision_at_k  P@k span-based — chunk top-k che coprono ≥1 span / k
+        span_recall_at_k     R@k span-centrica — span coperti da top-k / totale span
+                             Metrica primaria per il confronto tra configurazioni di
+                             chunking diverse (dimensioni B e C dell'ablation study),
+                             dove i chunk ID cambiano ma gli span testuali rimangono stabili.
+
+      LLM-as-judge:
+        avg_chunk_relevance_topk  Rilevanza media chunk top-k (rubrica discreta 0/1/2,
+                                  normalizzata a [0,1], giudice JUDGE_MODEL)
+
+    Nota: retrieval_time non viene calcolato qui — è già in RetrievalResult e viene
+    aggregato come media su tutte le query in aggregate_retrieval_metrics.
     """
     metrics = {}
 
-    chunk_ids = retrieval_result.retrieved_chunk_ids
-    # Per doc-level: estrae il NumRI dai chunk recuperati
-    retrieved_doc_ids = list(dict.fromkeys(cid.split("_")[0] for cid in chunk_ids))
+    chunk_ids   = retrieval_result.retrieved_chunk_ids
+    chunk_texts = retrieval_result.retrieved_chunk_texts
 
     for k in k_values:
         # --- Chunk-level ---
         metrics[f"precision_at_{k}"] = calculate_precision_at_k(
             chunk_ids, query.relevant_chunk_ids, k
         )
-        metrics[f"recall_at_{k}"] = calculate_recall_at_k(
-            chunk_ids, query.relevant_chunk_ids, k
-        )
         metrics[f"recall_at_{k}_norm"] = calculate_recall_at_k_normalized(
             chunk_ids, query.relevant_chunk_ids, k
         )
-        # --- Document-level (solo per confronto chunking) ---
-        if compute_doc_recall and query.relevant_doc_ids:
-            metrics[f"doc_recall_at_{k}"] = calculate_recall_at_k(
-                retrieved_doc_ids, query.relevant_doc_ids, k
+
+        # --- Span-level (se disponibili dopo migrate_to_spans.py) ---
+        if query.has_spans:
+            metrics[f"span_precision_at_{k}"] = calculate_span_precision_at_k(
+                chunk_texts, query.relevant_spans, k, span_threshold
+            )
+            metrics[f"span_recall_at_{k}"] = calculate_span_recall_at_k(
+                chunk_texts, query.relevant_spans, k, span_threshold
             )
 
         # --- LLM-as-judge chunk relevance ---
         metrics[f"avg_chunk_relevance_top{k}"] = calculate_average_chunk_relevance(
-            query.query_text,
-            retrieval_result.retrieved_chunk_texts,
-            client, llm_model, top_k=k
+            query.query_text, chunk_texts, client, llm_model, top_k=k
         )
 
-    metrics["retrieval_time"] = retrieval_result.retrieval_time
     return metrics
 
 
 # ==================== METRICHE DI GENERATION (QUERY POSITIVE) ====================
+
+def _strip_markdown(text: str) -> str:
+    """
+    Rimuove la formattazione markdown da un testo prima di passarlo al valutatore.
+    Elimina header (#), bold (**), italic (*), bullets (-, *), tabelle e blocchi codice.
+    """
+    import re
+    text = re.sub(r'```[\s\S]*?```', '', text)          # blocchi codice
+    text = re.sub(r'`[^`]+`', lambda m: m.group()[1:-1], text)  # inline code
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)  # header
+    text = re.sub(r'\*{1,3}([^*]+)\*{1,3}', r'\1', text)       # bold/italic
+    text = re.sub(r'^\s*[-*+]\s+', '', text, flags=re.MULTILINE) # bullets
+    text = re.sub(r'^\s*\d+\.\s+', '', text, flags=re.MULTILINE) # numbered list
+    text = re.sub(r'\|[^\n]+\|', '', text)              # tabelle
+    text = re.sub(r'\n{3,}', '\n\n', text)              # newline multipli
+    return text.strip()
+
 
 def _extract_atomic_claims(
     generated_answer: str,
@@ -344,35 +498,94 @@ def _extract_atomic_claims(
     Decompone la risposta generata in una lista di claim atomici verificabili
     individualmente. Un claim atomico è una singola proposizione fattuale che
     può essere confermata o smentita indipendentemente dalle altre.
+
+    Il testo viene prima stripped del markdown per ridurre il rumore di
+    formattazione. Se supera CHUNK_CHARS caratteri, viene spezzato in chunk
+    sovrapposti ed elaborato separatamente — i claim vengono poi deduplicati
+    per similarità stringa. Questo evita il troncamento dell'output JSON che
+    causava "Unterminated string" con max_tokens insufficienti.
     """
-    prompt = f"""Sei un assistente specializzato nell'analisi di testi tecnici.
+    CHUNK_CHARS = 2500   # ~600 token: lascia margine per output JSON a max_tokens=800
+    OVERLAP_CHARS = 200  # sovrapposizione tra chunk per non perdere claim a cavallo
 
-Dato il seguente testo, estraine tutti i claim fattuali atomici — cioè le singole
-affermazioni di fatto che possono essere verificate indipendentemente.
-Ignora frasi introduttive, congiunzioni e parti non fattuali.
+    plain_text = _strip_markdown(generated_answer)
 
-Testo:
+    # Se il testo è breve, estrazione diretta
+    if len(plain_text) <= CHUNK_CHARS:
+        return _extract_claims_from_chunk(plain_text, client, model)
+
+    # Altrimenti spezza in chunk sovrapposti ed estrai da ciascuno
+    all_claims: List[str] = []
+    start = 0
+    while start < len(plain_text):
+        chunk = plain_text[start:start + CHUNK_CHARS]
+        chunk_claims = _extract_claims_from_chunk(chunk, client, model)
+        all_claims.extend(chunk_claims)
+        start += CHUNK_CHARS - OVERLAP_CHARS
+
+    # Deduplicazione semplice: rimuove duplicati esatti e quasi-duplicati
+    # (stessa stringa con differenze minime di punteggiatura/capitalizzazione)
+    seen: List[str] = []
+    for claim in all_claims:
+        normalized = claim.lower().strip().rstrip('.')
+        if not any(normalized == s.lower().strip().rstrip('.') for s in seen):
+            seen.append(claim)
+    return seen
+
+
+def _extract_claims_from_chunk(
+    text:   str,
+    client: AzureOpenAI,
+    model:  str
+) -> List[str]:
+    """Estrae claim atomici da un singolo blocco di testo plain."""
+    system_prompt = (
+        "Sei un assistente specializzato nell'analisi di testi tecnici in italiano. "
+        "Il tuo compito è identificare le affermazioni fattuali presenti in un testo, "
+        "separando ogni fatto verificabile in un elemento distinto della lista."
+    )
+    user_prompt = f"""Analizza il testo seguente e produci una lista delle affermazioni fattuali in esso contenute.
+
+Ogni elemento della lista deve essere una singola proposizione verificabile (un fatto specifico, un dato, un riferimento).
+Le frasi introduttive, le congiunzioni e le valutazioni soggettive non sono affermazioni fattuali.
+
+Testo da analizzare:
 \"\"\"
-{generated_answer}
+{text}
 \"\"\"
 
-Rispondi SOLO con una lista JSON di stringhe, una per claim. Esempio:
+Formato di risposta: lista JSON di stringhe. Esempio:
 ["L'email del cliente è info@esempio.com", "Il referente è Mario Rossi"]
 
-Se il testo non contiene claim fattuali verificabili (es. risposta di assenza info),
-rispondi con una lista vuota: []"""
+Se il testo non contiene affermazioni fattuali verificabili, scrivi: []"""
 
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt}
+            ],
             temperature=0.0,
-            max_tokens=400
+            max_tokens=800
         )
-        text = response.choices[0].message.content.strip()
-        # Rimuove eventuali backtick markdown prima del parse
-        text = text.replace("```json", "").replace("```", "").strip()
-        claims = json.loads(text)
+        text_resp = response.choices[0].message.content.strip()
+        text_resp = text_resp.replace("```json", "").replace("```", "").strip()
+
+        # Recupero se JSON troncato: trova l'ultima stringa completa e chiude la lista
+        try:
+            claims = json.loads(text_resp)
+        except json.JSONDecodeError:
+            last_quote = text_resp.rfind('"')
+            if last_quote > 0:
+                truncated = text_resp[:last_quote + 1].rstrip().rstrip(',')
+                try:
+                    claims = json.loads(truncated + ']')
+                except json.JSONDecodeError:
+                    return []
+            else:
+                return []
+
         if isinstance(claims, list):
             return [str(c) for c in claims]
         return []
@@ -390,28 +603,34 @@ def _verify_single_claim(
     Verifica se un singolo claim atomico è supportato dal contesto.
     Ritorna 1.0 se supportato, 0.5 se parzialmente, 0.0 se non supportato.
     """
-    prompt = f"""Sei un valutatore esperto di sistemi RAG.
-
-Contesto (estratto dai documenti):
+    system_prompt = (
+        "Sei un valutatore esperto di sistemi RAG. "
+        "Il tuo compito è stabilire se una affermazione risulta confermata "
+        "da un testo di riferimento."
+    )
+    user_prompt = f"""Testo di riferimento (estratto dai documenti recuperati):
 \"\"\"
 {context_text}
 \"\"\"
 
-Claim da verificare: "{claim}"
+Affermazione da valutare: "{claim}"
 
-Il contesto supporta questo claim?
+Quanto è supportata questa affermazione dal testo di riferimento?
 
-Rispondi SOLO con uno di questi valori:
-- SUPPORTATO   (il contesto conferma esplicitamente il claim)
-- PARZIALE     (il contesto è correlato ma non conferma esplicitamente)
-- NON_SUPPORTATO (il claim non è presente o è contraddetto dal contesto)
+Valori possibili:
+- SUPPORTATO      il testo conferma esplicitamente l'affermazione
+- PARZIALE        il testo è correlato ma non la conferma in modo diretto
+- NON_SUPPORTATO  l'affermazione non è presente o è in contrasto con il testo
 
 Risposta:"""
 
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt}
+            ],
             temperature=0.0,
             max_tokens=10
         )
@@ -434,23 +653,29 @@ def _faithfulness_rubric_fallback(
     Valutazione di fallback con rubrica discreta 0/1/2 quando l'estrazione
     dei claim atomici non produce risultati (es. risposta troppo breve).
     """
+    import re
     context_text = "\n\n".join(context_chunks)
-    prompt = f"""Sei un valutatore esperto di sistemi RAG.
-
-Contesto:
+    system_prompt = (
+        "Sei un valutatore esperto di sistemi RAG. "
+        "Il tuo compito è valutare quanto le informazioni contenute in una risposta "
+        "siano supportate da un testo di riferimento."
+    )
+    user_prompt = f"""Testo di riferimento:
 \"\"\"
 {context_text}
 \"\"\"
 
-Risposta generata:
+Risposta da valutare:
 \"\"\"
 {generated_answer}
 \"\"\"
 
+Quanto è fedele la risposta al testo di riferimento?
+
 Rubrica:
-- 0 = La risposta contiene informazioni non presenti nel contesto (allucinazioni)
-- 1 = La risposta è parzialmente fedele: alcune informazioni sono nel contesto, altre no
-- 2 = La risposta è completamente fedele: ogni informazione è supportata dal contesto
+- 0 = La risposta contiene informazioni assenti nel testo di riferimento
+- 1 = La risposta è parzialmente fedele: alcune informazioni sono nel testo, altre no
+- 2 = La risposta è completamente fedele: ogni informazione è supportata dal testo
 
 Ragionamento: <1-2 frasi>
 Voto: <0, 1 o 2>"""
@@ -458,15 +683,22 @@ Voto: <0, 1 o 2>"""
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt}
+            ],
             temperature=0.0,
             max_tokens=80
         )
         text = response.choices[0].message.content.strip()
         for line in reversed(text.splitlines()):
             if line.startswith("Voto:"):
-                score = int(line.split(":")[1].strip())
-                return max(0.0, min(1.0, score / 2.0))
+                raw = line.split(":")[1].strip()
+                if raw in ("0", "1", "2"):
+                    return int(raw) / 2.0
+        match = re.search(r'\b([012])\b', text)
+        if match:
+            return int(match.group(1)) / 2.0
         return 0.0
     except Exception as e:
         print(f"  Errore fallback faithfulness: {e}")
@@ -516,6 +748,30 @@ def evaluate_faithfulness_with_llm(
 
     return faith_score, len(claims), n_supported
 
+def _strip_answer_for_relevancy(text: str) -> str:
+    """
+    Prepara la risposta generata per la valutazione di answer_relevancy:
+    1. Rimuove la sezione 'Documenti di riferimento' (non è parte della risposta
+       ma della citazione delle fonti, non deve influenzare il giudizio).
+    2. Rimuove la formattazione markdown residua.
+    """
+    import re
+    # Rimuove sezione documenti — cerca la prima riga numerata "N. RI: [..."
+    # oppure gli header espliciti tipo "### Documenti di riferimento"
+    patterns = [
+        r'\n---\n+#{1,4}\s*Documenti di riferimento.*',
+        r'\n#{1,4}\s*Documenti di riferimento.*',
+        r'\n---\n+\*\*Documenti[^*]*\*\*.*',
+        r'\n\d+\. RI: \[.*',
+    ]
+    for p in patterns:
+        m = re.search(p, text, re.DOTALL | re.IGNORECASE)
+        if m:
+            text = text[:m.start()]
+            break
+    return _strip_markdown(text).strip()
+
+
 def evaluate_answer_relevancy_with_llm(
     query:            str,
     generated_answer: str,
@@ -524,41 +780,84 @@ def evaluate_answer_relevancy_with_llm(
 ) -> float:
     """
     Valuta la pertinenza della risposta rispetto alla query con rubrica discreta.
-    Si valuta solo la qualità della risposta generata per le query positive —
-    le query negative hanno un sistema di valutazione dedicato (evaluate_negative_query).
+
+    Prima della valutazione la risposta viene pre-processata:
+    - rimossa la sezione 'Documenti di riferimento' (citazioni delle fonti)
+    - rimossa la formattazione markdown
+    Questo evita che il giudice polarizzi su risposte strutturate lunghe,
+    valutando solo il contenuto informativo effettivo.
+
+    Rubrica:
+    - 0 = La risposta non affronta la domanda (fuori tema o rifiuto)
+    - 1 = La risposta affronta la domanda ma in modo incompleto: almeno un
+          aspetto esplicitamente richiesto dalla query è assente o trattato
+          solo in modo marginale
+    - 2 = La risposta affronta direttamente tutti gli aspetti della domanda
     """
-    prompt = f"""Sei un valutatore esperto di sistemi RAG.
+    import re
+    clean_answer = _strip_answer_for_relevancy(generated_answer)
 
-Query utente: "{query}"
+    system_prompt = (
+        "Sei un valutatore esperto di sistemi RAG specializzato in documentazione "
+        "tecnica ERP. Il tuo compito è valutare quanto una risposta copre gli "
+        "aspetti richiesti dalla domanda dell'utente."
+    )
+    user_prompt = f"""Valuta la pertinenza della risposta rispetto alla query.
 
-Risposta generata:
+Rubrica:
+- 0 = La risposta non affronta la domanda (fuori tema, rifiuto, o risposta generica senza contenuto specifico)
+- 1 = La risposta affronta la domanda ma in modo incompleto: almeno un aspetto esplicitamente richiesto è assente o trattato solo superficialmente
+- 2 = La risposta affronta direttamente e completamente tutti gli aspetti della domanda
+
+Esempi calibrati:
+
+Query: "Qual è l'email di GMR Enlights e chi è il referente?"
+Risposta: "L'email è info@gmrenlights.com."
+Ragionamento: La risposta fornisce l'email ma non risponde alla domanda sul referente, che era esplicitamente richiesto.
+Voto: 1
+
+Query: "Come funziona il calcolo delle spese di trasporto per Logos SPA?"
+Risposta: "In SAM ERP2 esistono vari plugin per personalizzare i documenti di vendita."
+Ragionamento: La risposta non affronta la logica specifica del calcolo delle spese di trasporto per Logos SPA.
+Voto: 0
+
+Query: "Come si configura la periodicità di liquidazione degli interessi per conto banca?"
+Risposta: "La periodicità si configura per ogni conto banca con diverse opzioni: mensile (giorno e periodo di riferimento), trimestrale (quattro date), semestrale (due date con relativi periodi). Ogni configurazione determina quando il sistema calcola e registra gli interessi."
+Ragionamento: La risposta copre direttamente la configurazione della periodicità con tutte le opzioni richieste.
+Voto: 2
+
+---
+
+Query: "{query}"
+
+Risposta da valutare:
 \"\"\"
-{generated_answer}
+{clean_answer}
 \"\"\"
 
-Valuta la pertinenza della risposta alla query seguendo questa rubrica:
-- 0 = La risposta non risponde alla domanda posta
-- 1 = La risposta risponde parzialmente o in modo indiretto alla domanda
-- 2 = La risposta risponde direttamente e completamente alla domanda
-
-Ragiona brevemente (1-2 frasi), poi emetti il voto.
-
-Formato risposta (rispetta esattamente):
-Ragionamento: <testo>
+Ragionamento: <1-2 frasi che identificano quali aspetti della query sono coperti e quali mancano>
 Voto: <0, 1 o 2>"""
 
     try:
         response = client.chat.completions.create(
             model=model,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt}
+            ],
             temperature=0.0,
-            max_tokens=80
+            max_tokens=120
         )
         text = response.choices[0].message.content.strip()
         for line in reversed(text.splitlines()):
             if line.startswith("Voto:"):
-                score = int(line.split(":")[1].strip())
-                return max(0.0, min(1.0, score / 2.0))
+                raw = line.split(":")[1].strip()
+                if raw in ("0", "1", "2"):
+                    return int(raw) / 2.0
+        import re as _re
+        match = _re.search(r'\b([012])\b', text)
+        if match:
+            return int(match.group(1)) / 2.0
         return 0.0
     except Exception as e:
         print(f"  Errore valutazione answer relevancy: {e}")
@@ -612,7 +911,6 @@ def evaluate_generation_for_query(
     else:
         metrics["semantic_similarity"] = None
 
-    metrics["generation_time"] = generation_result.generation_time
     return metrics
 
 
@@ -842,7 +1140,16 @@ def aggregate_negative_metrics(results: List[NegativeEvaluationResult]) -> Dict[
 
 # ==================== AGGREGAZIONE METRICHE POSITIVE ====================
 
-def aggregate_retrieval_metrics(per_query_metrics: List[Dict[str, float]]) -> Dict[str, float]:
+def aggregate_retrieval_metrics(
+    per_query_metrics:  List[Dict[str, float]],
+    retrieval_results:  List[RetrievalResult]
+) -> Dict[str, float]:
+    """
+    Aggrega le metriche di retrieval su tutte le query positive.
+    retrieval_time e co_retrieval_pct vengono calcolati direttamente
+    dai RetrievalResult per avere la media su tutte le query (incluse
+    quelle negative che non hanno metriche di retrieval).
+    """
     if not per_query_metrics:
         return {}
     metric_keys = set(k for m in per_query_metrics for k in m.keys())
@@ -851,9 +1158,32 @@ def aggregate_retrieval_metrics(per_query_metrics: List[Dict[str, float]]) -> Di
         values = [m[key] for m in per_query_metrics if key in m and m[key] is not None]
         if values:
             aggregated[f"avg_{key}"] = float(np.mean(values))
+
+    # Tempo medio di retrieval su tutte le query
+    if retrieval_results:
+        aggregated["avg_retrieval_time"] = float(
+            np.mean([r.retrieval_time for r in retrieval_results])
+        )
+
+    # Media percentuale co-retrieval (solo multistage, query dove both=True)
+    co_pcts = [
+        r.co_retrieval_pct for r in retrieval_results
+        if r.co_retrieval_pct is not None
+    ]
+    if co_pcts:
+        aggregated["avg_co_retrieval_pct"] = float(np.mean(co_pcts))
+
     return aggregated
 
-def aggregate_generation_metrics(per_query_metrics: List[Dict[str, float]]) -> Dict[str, float]:
+def aggregate_generation_metrics(
+    per_query_metrics:  List[Dict[str, float]],
+    generation_results: List[GenerationResult]
+) -> Dict[str, float]:
+    """
+    Aggrega le metriche di generation su tutte le query positive.
+    generation_time viene calcolato come media su tutte le query
+    (incluse le negative che non hanno metriche di generation standard).
+    """
     if not per_query_metrics:
         return {}
     metric_keys = set(k for m in per_query_metrics for k in m.keys())
@@ -862,6 +1192,13 @@ def aggregate_generation_metrics(per_query_metrics: List[Dict[str, float]]) -> D
         values = [m[key] for m in per_query_metrics if key in m and m[key] is not None]
         if values:
             aggregated[f"avg_{key}"] = float(np.mean(values))
+
+    # Tempo medio di generation su tutte le query
+    if generation_results:
+        aggregated["avg_generation_time"] = float(
+            np.mean([g.generation_time for g in generation_results])
+        )
+
     return aggregated
 
 
@@ -1030,8 +1367,10 @@ def run_retrieval_with_multistage(
             all_docs = list(seen.values())
 
             co_count = total_before - len(all_docs)
-            if total_before > 0:
-                print(f"  → Co-retrieval: {co_count}/{total_before} chunk ({co_count/total_before*100:.1f}%)")
+            co_pct = (co_count / total_before * 100) if total_before > 0 else 0.0
+            if use_semantic and use_keyword and total_before > 0:
+                # Co-retrieval significativo solo quando entrambi i retriever sono stati usati
+                print(f"  → Co-retrieval: {co_count}/{total_before} chunk ({co_pct:.1f}%)")
 
             retrieved_chunk_ids   = [f"{d['numero']}_{d['progressivo']}" for d in all_docs]
             retrieved_chunk_texts = [d['content'] for d in all_docs]
@@ -1047,13 +1386,15 @@ def run_retrieval_with_multistage(
             print(f"  ✗ Errore: {e}")
             retrieved_chunk_ids, retrieved_chunk_texts = [], []
             tool_decision = {"use_semantic": False, "use_keyword": False, "reason": f"Errore: {e}"}
+            co_pct = None
 
         retrieval_results.append(RetrievalResult(
             query_id              = query.query_id,
             retrieved_chunk_ids   = retrieved_chunk_ids,
             retrieved_chunk_texts = retrieved_chunk_texts,
             retrieval_time        = time.time() - start_time,
-            tool_decision         = tool_decision
+            tool_decision         = tool_decision,
+            co_retrieval_pct      = co_pct if (tool_decision.get("use_semantic") and tool_decision.get("use_keyword")) else None
         ))
 
     print(f"\n{'='*70}\n")
@@ -1177,10 +1518,9 @@ def run_full_evaluation(
     generation_results:  List[GenerationResult],
     configuration:       Dict,
     client:              AzureOpenAI,
-    k_values:            List[int] = [5, 10],
+    k_values:            List[int] = [3, 5, 10],
     llm_model:           str = JUDGE_MODEL,
-    embedding_model:     str = "text-embedding-3-large",
-    compute_doc_recall:  bool = False   # Abilitare solo per esperimento chunking
+    embedding_model:     str = "text-embedding-3-large"
 ) -> TestResult:
 
     start_time = time.time()
@@ -1199,32 +1539,26 @@ def run_full_evaluation(
         print(f"\n[{i}/{len(gold_queries)}] {query.query_id}  {'[NEGATIVA]' if query.is_negative else ''}")
 
         if query.is_negative:
-            # --- Valutazione query negativa ---
-            # Le metriche di retrieval standard non si applicano (no chunk rilevanti attesi
-            # per no_answer/clarification, oppure hanno senso parziale per correction).
-            # Valutiamo solo il comportamento della generation.
             print(f"  - Comportamento atteso: {query.expected_behavior}")
             neg_result = evaluate_negative_query(query, gen, client, llm_model)
             negative_eval_results.append(neg_result)
             print(f"  → {neg_result.behavior_label}")
 
             per_query_details.append({
-                "query_id":         query.query_id,
-                "query_text":       query.query_text,
-                "is_negative":      True,
+                "query_id":          query.query_id,
+                "query_text":        query.query_text,
+                "is_negative":       True,
                 "expected_behavior": query.expected_behavior,
-                "behavior_score":   neg_result.behavior_score,
-                "behavior_label":   neg_result.behavior_label,
-                "llm_reasoning":    neg_result.llm_reasoning,
-                "generated_answer": gen.generated_answer,
+                "behavior_score":    neg_result.behavior_score,
+                "behavior_label":    neg_result.behavior_label,
+                "llm_reasoning":     neg_result.llm_reasoning,
+                "generated_answer":  gen.generated_answer,
             })
 
         else:
-            # --- Valutazione query positiva ---
             print("  - Metriche retrieval...")
             ret_metrics = evaluate_retrieval_for_query(
-                query, ret, client, k_values, llm_model,
-                compute_doc_recall=compute_doc_recall
+                query, ret, client, k_values, llm_model
             )
             per_query_retrieval_metrics.append(ret_metrics)
 
@@ -1235,13 +1569,15 @@ def run_full_evaluation(
             per_query_generation_metrics.append(gen_metrics)
 
             per_query_details.append({
-                "query_id":             query.query_id,
-                "query_text":           query.query_text,
-                "is_negative":          False,
-                "retrieval_metrics":    ret_metrics,
-                "generation_metrics":   gen_metrics,
-                "generated_answer":     gen.generated_answer,
+                "query_id":              query.query_id,
+                "query_text":            query.query_text,
+                "is_negative":           False,
+                "retrieval_metrics":     ret_metrics,
+                "generation_metrics":    gen_metrics,
+                "generated_answer":      gen.generated_answer,
                 "retrieved_chunk_count": len(ret.retrieved_chunk_ids),
+                "retrieval_time":        ret.retrieval_time,
+                "generation_time":       gen.generation_time,
             })
 
         print(f"  ✓ {query.query_id} completata")
@@ -1250,19 +1586,23 @@ def run_full_evaluation(
     print("AGGREGAZIONE METRICHE")
     print("="*70)
 
-    aggregated_retrieval  = aggregate_retrieval_metrics(per_query_retrieval_metrics)
-    aggregated_generation = aggregate_generation_metrics(per_query_generation_metrics)
+    aggregated_retrieval  = aggregate_retrieval_metrics(
+        per_query_retrieval_metrics, retrieval_results
+    )
+    aggregated_generation = aggregate_generation_metrics(
+        per_query_generation_metrics, generation_results
+    )
     aggregated_negative   = aggregate_negative_metrics(negative_eval_results)
 
     return TestResult(
-        test_id                = f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-        timestamp              = datetime.now().isoformat(),
-        configuration          = configuration,
-        retrieval_metrics      = aggregated_retrieval,
-        generation_metrics     = aggregated_generation,
-        negative_eval_metrics  = aggregated_negative,
-        per_query_details      = per_query_details,
-        total_evaluation_time  = time.time() - start_time
+        test_id               = f"test_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+        timestamp             = datetime.now().isoformat(),
+        configuration         = configuration,
+        retrieval_metrics     = aggregated_retrieval,
+        generation_metrics    = aggregated_generation,
+        negative_eval_metrics = aggregated_negative,
+        per_query_details     = per_query_details,
+        total_evaluation_time = time.time() - start_time
     )
 
 
@@ -1314,43 +1654,46 @@ def compare_test_results(test_results: List[TestResult]):
     print("="*130)
 
     col = 38
-    print(f"\n{'Configurazione':<{col}} {'P@5':>7} {'R@5':>7} {'R@5n':>7} {'LLM-Rel':>8} {'Faith':>7} {'Relev':>7} {'SemSim':>7} {'Robust':>8}")
+    col = 38
+    print(f"\n{'Configurazione':<{col}} {'P@5':>7} {'R@5n':>7} {'SpR@5':>7} {'LLM-Rel':>8} {'Faith':>7} {'Relev':>7} {'SemSim':>7} {'Robust':>8} {'RetT':>8} {'GenT':>8}")
     print("-"*130)
 
     for result in test_results:
         name    = result.configuration.get('name', result.test_id)[:col - 2]
         p5      = result.retrieval_metrics.get('avg_precision_at_5', 0.0)
-        r5      = result.retrieval_metrics.get('avg_recall_at_5', 0.0)
         r5n     = result.retrieval_metrics.get('avg_recall_at_5_norm', 0.0)
+        spr5    = result.retrieval_metrics.get('avg_span_recall_at_5', 0.0)
         llmrel  = result.retrieval_metrics.get('avg_avg_chunk_relevance_top5', 0.0)
         faith   = result.generation_metrics.get('avg_faithfulness', 0.0)
         relev   = result.generation_metrics.get('avg_answer_relevancy', 0.0)
         semsim  = result.generation_metrics.get('avg_semantic_similarity') or 0.0
         robust  = result.negative_eval_metrics.get('robustness_overall', 0.0)
+        ret_t   = result.retrieval_metrics.get('avg_retrieval_time', 0.0)
+        gen_t   = result.generation_metrics.get('avg_generation_time', 0.0)
 
-        print(f"{name:<{col}} {p5:>7.4f} {r5:>7.4f} {r5n:>7.4f} {llmrel:>8.4f} {faith:>7.4f} {relev:>7.4f} {semsim:>7.4f} {robust:>8.4f}")
+        print(f"{name:<{col}} {p5:>7.4f} {r5n:>7.4f} {spr5:>7.4f} {llmrel:>8.4f} {faith:>7.4f} {relev:>7.4f} {semsim:>7.4f} {robust:>8.4f} {ret_t:>7.2f}s {gen_t:>7.2f}s")
 
     print("="*130)
     print("\nLegenda:")
     print("  P@5     = Precision@5 (chunk-level)")
-    print("  R@5     = Recall@5 standard (chunk-level)")
-    print("  R@5n    = Recall@5 normalizzata — denominatore min(5, |R|)")
-    print("  LLM-Rel = LLM-as-judge chunk relevance (rubrica 0/1/2, media top-5)")
-    print("  Faith   = Faithfulness (LLM-as-judge, rubrica 0/1/2)")
+    print("  R@5n    = Recall@5 normalizzata — denominatore min(5, |R|), mai penalizzata per |R|>k")
+    print("  SpR@5   = Span Recall@5 — span coperti tra top-5 / totale span (metrica primaria per confronto chunking)")
+    print("  LLM-Rel = LLM-as-judge rilevanza chunk top-5 (rubrica 0/1/2, normalizzata)")
+    print("  Faith   = Faithfulness con claim atomici (LLM-as-judge, gpt-4.1)")
     print("  Relev   = Answer Relevancy (LLM-as-judge, rubrica 0/1/2)")
-    print("  SemSim  = Semantic Similarity (cosine su embeddings)")
-    print("  Robust  = Robustezza su query negative (0=fallisce, 1=gestisce correttamente)")
+    print("  SemSim  = Semantic Similarity (cosine su embeddings tra risposta e reference)")
+    print("  Robust  = Robustezza su query negative (0=comportamento errato, 1=corretto)")
+    print("  RetT    = Tempo medio retrieval per query (secondi)")
+    print("  GenT    = Tempo medio generation per query (secondi)")
     print()
-
 
 # ==================== TEST PRINCIPALE ====================
 
 def run_test_with_your_pipeline(
-    gold_dataset_path:  str,
-    configuration:      dict,
-    search_strategy:    str  = SearchStrategy.SEMANTIC,
-    results_dir:        str  = "evaluation_results",
-    compute_doc_recall: bool = False
+    gold_dataset_path: str,
+    configuration:     dict,
+    search_strategy:   str = SearchStrategy.SEMANTIC,
+    results_dir:       str = "evaluation_results"
 ):
     print("\n" + "="*70)
     print(f"TEST: {configuration.get('name', 'Unnamed')}")
@@ -1380,22 +1723,21 @@ def run_test_with_your_pipeline(
     print("\n[3/4] Generation...")
     generation_results = run_generation_with_llm(
         gold_queries, retrieval_results,
-        llm_model=configuration.get('llm_model', 'gpt-4-1')
+        llm_model=configuration.get('llm_model', 'gpt-4.1')
     )
 
     print("\n[4/4] Valutazione metriche...")
     client = load_openai_client()
 
     test_result = run_full_evaluation(
-        gold_queries        = gold_queries,
-        retrieval_results   = retrieval_results,
-        generation_results  = generation_results,
-        configuration       = configuration,
-        client              = client,
-        k_values            = [3, 5, 10],
-        llm_model           = JUDGE_MODEL,
-        embedding_model     = "text-embedding-3-large",
-        compute_doc_recall  = compute_doc_recall
+        gold_queries       = gold_queries,
+        retrieval_results  = retrieval_results,
+        generation_results = generation_results,
+        configuration      = configuration,
+        client             = client,
+        k_values           = [3, 5, 10],
+        llm_model          = JUDGE_MODEL,
+        embedding_model    = "text-embedding-3-large"
     )
 
     print_test_result(test_result)
@@ -1433,205 +1775,210 @@ def print_tool_selection_stats(stats: Dict):
     print("="*70)
 
 
-def esempio_test_semantic_search():
-    return run_test_with_your_pipeline(
-        gold_dataset_path=GOLD_DATASET_PATH,
-        configuration={
-            "name": "Semantic Search",
-            "search_strategy": "semantic",
-            "embedding_model": EMBEDDING_MODEL_1,
-            "llm_model": "gpt-4.1",
-            "top_k": 10
-        },
-        search_strategy=SearchStrategy.SEMANTIC
-    )
 
-def esempio_test_keyword_search():
-    return run_test_with_your_pipeline(
-        gold_dataset_path=GOLD_DATASET_PATH,
-        configuration={
-            "name": "Keyword Search BM25",
-            "search_strategy": "keyword",
-            "llm_model": "gpt-4.1",
-            "top_k": 10
-        },
-        search_strategy=SearchStrategy.KEYWORD
-    )
 
-def esempio_test_hybrid_search():
-    return run_test_with_your_pipeline(
-        gold_dataset_path=GOLD_DATASET_PATH,
-        configuration={
-            "name": "Hybrid Search (50/50)",
-            "search_strategy": "hybrid",
-            "semantic_weight": 0.5,
-            "embedding_model": EMBEDDING_MODEL_1,
-            "llm_model": "gpt-4.1",
-            "top_k": 10
-        },
-        search_strategy=SearchStrategy.HYBRID
-    )
 
-def esempio_test_multistage():
-    return run_test_with_your_pipeline(
-        gold_dataset_path=GOLD_DATASET_PATH,
-        configuration={
-            "name": "Multi-stage (adattivo)",
-            "search_strategy": "multistage",
-            "embedding_model": EMBEDDING_MODEL_1,
-            "llm_model": "gpt-4.1",
-            "top_k": 10
-        },
-        search_strategy=SearchStrategy.MULTISTAGE
-    )
-
-def esempio_confronto_strategie():
-    print("\n" + "="*70)
-    print("CONFRONTO STRATEGIE DI SEARCH")
-    print("="*70)
-    results = []
-    print("\n[TEST 1/4] Semantic Search...")
-    results.append(esempio_test_semantic_search())
-    print("\n[TEST 2/4] Keyword Search (BM25)...")
-    results.append(esempio_test_keyword_search())
-    print("\n[TEST 3/4] Hybrid Search...")
-    results.append(esempio_test_hybrid_search())
-    print("\n[TEST 4/4] Multi-stage (adattivo)...")
-    results.append(esempio_test_multistage())
-    compare_test_results(results)
 
 
 # ==================== ABLATION STUDY ====================
 
 def run_ablation_study(
-    gold_dataset_path: str = GOLD_DATASET_PATH,
-    results_dir:       str = "evaluation_results/ablation"
+    gold_dataset_path: str       = GOLD_DATASET_PATH,
+    results_dir:       str       = "evaluation_results/ablation",
+    dimensions:        List[str] = None
 ) -> Dict[str, TestResult]:
     """
     Ablation study sequenziale: parte dalla BASELINE_CONFIG e varia
     una dimensione per volta, mantenendo tutto il resto fisso.
 
-    Dimensioni testate:
+    Dimensioni disponibili:
+      — Senza re-indicizzazione del DB (eseguibili in una sola sessione) —
       A) Strategia di search   : multistage (baseline) | hybrid | semantic | keyword
-      B) Chunking               : recursive_custom_1024 (baseline) | fixed_512 | recursive_standard_1024
-      C) Dimensione chunk       : 1024/overlap150 (baseline) | 512/overlap100
-      D) Modello embedding      : ada-002 (baseline) | text-embedding-3-large
-      E) Modello LLM generativo : gpt-4.1 (baseline) | gpt-5
-      F) Top-k documenti        : 10 (baseline) | 8 | 15
+      B) Modello LLM generativo: gpt-4.1 (baseline) | gpt-5
+      C) Top-k documenti       : 10 (baseline) | 15
 
-    Per il confronto chunking (B e C) viene abilitato compute_doc_recall=True
-    in modo da poter confrontare le strategie indipendentemente dalla
-    frammentazione del documento.
+      — Con re-indicizzazione del DB (sessioni separate) —
+      D) Tipo di chunking      : recursive_custom_1024 (baseline) | fixed_512 | recursive_standard_1024
+      E) Dimensione chunk      : 1024/overlap150 (baseline) | 512/overlap100
+      F) Modello embedding     : ada-002 (baseline) | text-embedding-3-large
 
-    Nota: il cambio di chunking/embedding richiede che il database sia stato
-    pre-indicizzato con la configurazione corrispondente prima di eseguire
-    il test. La pipeline di valutazione si assume che il sistema sia già
-    configurato correttamente — non gestisce il re-embedding automatico.
+    Sessioni di esecuzione consigliate:
+      Sessione 1 — DB baseline invariato : run_ablation_study(dimensions=["A", "B", "C"])
+      Sessione 2 — DB fixed_512          : run_ablation_study(dimensions=["D", "E"])  # D2, E2
+      Sessione 3 — DB recursive_standard : run_ablation_study(dimensions=["D"])       # solo D3
+      Sessione 4 — DB embedding-3-large  : run_ablation_study(dimensions=["F"])       # F2
+
+    Per D ed E la metrica primaria di confronto è span_recall, invariante al
+    chunking perché lavora sul testo originale invece che sugli ID dei chunk.
     """
+    active = set(d.upper() for d in dimensions) if dimensions else None
 
     results: Dict[str, TestResult] = {}
     all_configs = []
 
-    # ── A: Strategia di search ──────────────────────────────────────────
-    for strategy, name in [
-        (SearchStrategy.MULTISTAGE, "A1_multistage_baseline"),
-        (SearchStrategy.HYBRID,     "A2_hybrid_fixed"),
-        (SearchStrategy.SEMANTIC,   "A3_semantic_only"),
-        (SearchStrategy.KEYWORD,    "A4_keyword_only"),
-    ]:
-        cfg = {**BASELINE_CONFIG, "name": name, "search_strategy": strategy}
-        all_configs.append(("search", cfg, strategy, False))
+    # ── A: Strategia di search (no re-indicizzazione) ────────────────────────
+    if active is None or "A" in active:
+        for strategy, name in [
+            (SearchStrategy.MULTISTAGE, "A1_multistage_baseline"),
+            (SearchStrategy.HYBRID,     "A2_hybrid_fixed"),
+            (SearchStrategy.SEMANTIC,   "A3_semantic_only"),
+            (SearchStrategy.KEYWORD,    "A4_keyword_only"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "search_strategy": strategy}
+            all_configs.append(("A", cfg, strategy))
 
-    # ── B: Tipo di chunking (doc_recall abilitato) ───────────────────────
-    for chunking, name in [
-        ("recursive_custom_1024",   "B1_recursive_custom_baseline"),
-        ("fixed_512",               "B2_fixed_size_512"),
-        ("recursive_standard_1024", "B3_recursive_standard_1024"),
-    ]:
-        cfg = {**BASELINE_CONFIG, "name": name, "chunking": chunking}
-        all_configs.append(("chunking", cfg, BASELINE_CONFIG["search_strategy"], True))
+    # ── B: Modello LLM generativo (no re-indicizzazione) ─────────────────────
+    if active is None or "B" in active:
+        for llm_model, name in [
+            ("gpt-4.1", "B1_gpt41_baseline"),
+            ("gpt-5",   "B2_gpt5"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "llm_model": llm_model}
+            all_configs.append(("B", cfg, BASELINE_CONFIG["search_strategy"]))
 
-    # ── C: Dimensione chunk (doc_recall abilitato) ────────────────────────
-    for chunk_size, overlap, name in [
-        (1024, 150, "C1_chunk1024_overlap150_baseline"),
-        (512,  100, "C2_chunk512_overlap100"),
-    ]:
-        cfg = {**BASELINE_CONFIG, "name": name,
-               "chunk_size": chunk_size, "chunk_overlap": overlap}
-        all_configs.append(("chunking", cfg, BASELINE_CONFIG["search_strategy"], True))
+    # ── C: Top-k (no re-indicizzazione) ──────────────────────────────────────
+    if active is None or "C" in active:
+        for top_k, name in [
+            (10, "C1_topk10_baseline"),
+            (5,  "C2_topk5"),
+            (15, "C3_topk15"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "top_k": top_k}
+            all_configs.append(("C", cfg, BASELINE_CONFIG["search_strategy"]))
 
-    # ── D: Modello embedding ─────────────────────────────────────────────
-    for emb_model, name in [
-        ("text-embedding-ada-002",   "D1_ada002_baseline"),
-        ("text-embedding-3-large",   "D2_embedding3large"),
-    ]:
-        cfg = {**BASELINE_CONFIG, "name": name, "embedding_model": emb_model}
-        all_configs.append(("embedding", cfg, BASELINE_CONFIG["search_strategy"], False))
+    # ── D: Tipo di chunking (richiede re-indicizzazione) ─────────────────────
+    if active is None or "D" in active:
+        for chunking, name in [
+            ("recursive_custom_1024",   "D1_recursive_custom_baseline"),
+            ("fixed_512",               "D2_fixed_size_512"),
+            ("recursive_standard_1024", "D3_recursive_standard_1024"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "chunking": chunking}
+            all_configs.append(("D", cfg, BASELINE_CONFIG["search_strategy"]))
 
-    # ── E: Modello LLM generativo ────────────────────────────────────────
-    for llm_model, name in [
-        ("gpt-4.1", "E1_gpt41_baseline"),
-        ("gpt-5",   "E2_gpt5"),
-    ]:
-        cfg = {**BASELINE_CONFIG, "name": name, "llm_model": llm_model}
-        all_configs.append(("llm", cfg, BASELINE_CONFIG["search_strategy"], False))
+    # ── E: Dimensione chunk (richiede re-indicizzazione) ──────────────────────
+    if active is None or "E" in active:
+        for chunk_size, overlap, name in [
+            (1024, 150, "E1_chunk1024_overlap150_baseline"),
+            (512,  100, "E2_chunk512_overlap100"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name,
+                   "chunk_size": chunk_size, "chunk_overlap": overlap}
+            all_configs.append(("E", cfg, BASELINE_CONFIG["search_strategy"]))
 
-    # ── F: Top-k ─────────────────────────────────────────────────────────
-    for top_k, name in [
-        (10, "F1_topk10_baseline"),
-        (8,  "F2_topk8"),
-        (15, "F3_topk15"),
-    ]:
-        cfg = {**BASELINE_CONFIG, "name": name, "top_k": top_k}
-        all_configs.append(("topk", cfg, BASELINE_CONFIG["search_strategy"], False))
+    # ── F: Modello embedding (richiede re-indicizzazione) ─────────────────────
+    if active is None or "F" in active:
+        for emb_model, name in [
+            ("text-embedding-ada-002", "F1_ada002_baseline"),
+            ("text-embedding-3-large", "F2_embedding3large"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "embedding_model": emb_model}
+            all_configs.append(("F", cfg, BASELINE_CONFIG["search_strategy"]))
+
+    if not all_configs:
+        print(f"Nessuna dimensione valida tra quelle specificate: {dimensions}")
+        return results
 
     # ── Esecuzione ────────────────────────────────────────────────────────
     total = len(all_configs)
+    dims_label = ", ".join(sorted(active)) if active else "A-F"
     print(f"\n{'='*70}")
-    print(f"ABLATION STUDY: {total} esperimenti")
+    print(f"ABLATION STUDY — dimensioni: {dims_label} ({total} esperimenti)")
     print(f"{'='*70}\n")
 
-    for i, (dimension, cfg, strategy, use_doc_recall) in enumerate(all_configs, 1):
-        print(f"\n[{i}/{total}] Dimensione: {dimension.upper()}  —  {cfg['name']}")
-
+    for i, (dimension, cfg, strategy) in enumerate(all_configs, 1):
+        print(f"\n[{i}/{total}] [{dimension}]  {cfg['name']}")
         result = run_test_with_your_pipeline(
-            gold_dataset_path  = gold_dataset_path,
-            configuration      = cfg,
-            search_strategy    = strategy,
-            results_dir        = results_dir,
-            compute_doc_recall = use_doc_recall
+            gold_dataset_path = gold_dataset_path,
+            configuration     = cfg,
+            search_strategy   = strategy,
+            results_dir       = results_dir
         )
         results[cfg["name"]] = result
 
     print(f"\n{'='*70}")
-    print("ABLATION STUDY COMPLETATO")
+    print(f"ABLATION STUDY COMPLETATO — {len(results)}/{total} esperimenti")
     print(f"{'='*70}")
     compare_test_results(list(results.values()))
     return results
 
 
+def run_smoke_test(strategy: str = SearchStrategy.MULTISTAGE) -> TestResult:
+    """
+    Esegue un test rapido su una singola strategia con la configurazione baseline.
+    Non produce dati della tesi — serve a verificare che la pipeline funzioni
+    end-to-end prima di lanciare l'ablation study completo.
+
+    Uso da codice:
+        from evaluation_pipeline import run_smoke_test, SearchStrategy
+        result = run_smoke_test(strategy=SearchStrategy.MULTISTAGE)
+
+    Uso da terminale:
+        python evaluation_pipeline.py --smoke-test [semantic|keyword|hybrid|multistage]
+    """
+    config = dict(BASELINE_CONFIG)
+    config["name"] = f"Smoke Test — {strategy}"
+    return run_test_with_your_pipeline(
+        gold_dataset_path = GOLD_DATASET_PATH,
+        configuration     = config,
+        search_strategy   = strategy,
+        results_dir       = "evaluation_results/smoke"
+    )
+
 
 def main():
-    print("="*70)
-    print("PIPELINE UNIFICATA DI VALUTAZIONE SISTEMA RAG")
-    print("="*70)
-    print("\nScegli il tipo di test:")
-    print("1. Semantic Search (vector similarity)")
-    print("2. Keyword Search (BM25)")
-    print("3. Hybrid Search (semantic + keyword)")
-    print("4. Multi-stage (tool selection adattivo)")
-    print("5. Confronto tutte le strategie")
-    print("6. Ablation study completo")
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Pipeline di valutazione sistema RAG — Tesi magistrale"
+    )
+    parser.add_argument(
+        "--dimensions", "-d",
+        nargs="+",
+        metavar="DIM",
+        help="Dimensioni ablation da eseguire (es. A E F). Default: tutte (A-F)."
+    )
+    parser.add_argument(
+        "--smoke-test", "-s",
+        metavar="STRATEGY",
+        nargs="?",
+        const="multistage",
+        help="Smoke test rapido invece dell'ablation. "
+             "Strategie: semantic | keyword | hybrid | multistage (default)."
+    )
+    parser.add_argument(
+        "--results-dir", "-o",
+        default="evaluation_results/ablation",
+        help="Directory di output per i risultati JSON."
+    )
+    args = parser.parse_args()
 
-    choice = input("\nSelezione (1-6): ").strip()
+    print("=" * 70)
+    print("PIPELINE DI VALUTAZIONE SISTEMA RAG")
+    print("=" * 70)
 
-    if   choice == "1": esempio_test_semantic_search()
-    elif choice == "2": esempio_test_keyword_search()
-    elif choice == "3": esempio_test_hybrid_search()
-    elif choice == "4": esempio_test_multistage()
-    elif choice == "5": esempio_confronto_strategie()
-    elif choice == "6": run_ablation_study()
-    else:               print("Selezione non valida")
+    if args.smoke_test is not None:
+        strategy_map = {
+            "semantic":   SearchStrategy.SEMANTIC,
+            "keyword":    SearchStrategy.KEYWORD,
+            "hybrid":     SearchStrategy.HYBRID,
+            "multistage": SearchStrategy.MULTISTAGE,
+        }
+        strategy = strategy_map.get(args.smoke_test.lower())
+        if strategy is None:
+            print(f"Strategia non valida: {args.smoke_test!r}. "
+                  f"Usa: {', '.join(strategy_map)}")
+            return
+        print(f"\nModalità: smoke test — {args.smoke_test}")
+        run_smoke_test(strategy)
+    else:
+        dims = args.dimensions if args.dimensions else None
+        label = ", ".join(dims) if dims else "A-F (complete)"
+        print(f"\nModalità: ablation study — dimensioni {label}")
+        run_ablation_study(
+            gold_dataset_path = GOLD_DATASET_PATH,
+            results_dir       = args.results_dir,
+            dimensions        = dims
+        )
 
 
 if __name__ == "__main__":

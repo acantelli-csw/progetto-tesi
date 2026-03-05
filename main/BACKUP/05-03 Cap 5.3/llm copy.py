@@ -2,20 +2,17 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI
 import json
 import os
-import time
-import types
-try:
-    from llm.search import semantic_search, keyword_search
-except ImportError:
-    from search import semantic_search, keyword_search
+from llm.search import semantic_search, keyword_search
 import tiktoken
 from docx import Document
 from difflib import SequenceMatcher
 
 # 0. CONFIGURAZIONE =====================================================
 
+# Carica variabili d'ambiente
 load_dotenv()
 
+# Inizializza il client Azure OpenAI
 client = AzureOpenAI(
     azure_endpoint=os.getenv("LLM_URL"),
     api_key=os.getenv("OPENAI_API_KEY"),
@@ -63,10 +60,12 @@ def decide_tools(prompt: str) -> dict:
         }
     ]
 
+    # Costruisco il few-shot prompt 
     few_shot_text = ""
     for ex in examples:
         few_shot_text += f"Prompt utente: {ex['prompt']}\nDecisione: {json.dumps(ex['decision'])}\n\n"
 
+    # STEP 1
     system_message = f"""
     Sei un assistente decisionale esperto del software gestionale SAM ERP2 di Centro Software.
     Devi decidere quali strumenti di ricerca usare per trovare Richieste di Implementazione (RI) pertinenti.
@@ -111,24 +110,27 @@ def decide_tools(prompt: str) -> dict:
         ],
         temperature=0.1,
     )
-
+    
     decision_text = response.choices[0].message.content
-
+    
     try:
         decision = json.loads(decision_text)
     except json.JSONDecodeError:
+        # fallback se il modello non restituisce JSON valido
         decision = {
             "use_semantic": False,
             "use_keyword": False,
             "reason": f"Errore nel parsing della risposta: {decision_text}"
         }
-
+    
     return decision
+
 
 # 2. SELEZIONE DOCUMENTI =====================================================
 def select_documents(user_prompt: str, chunks: list) -> dict:
-
+    
     # STEP 3a
+    # Rimozione duplicati segnalando importanza maggiore 
     seen = {}
     for doc in chunks:
         key = (doc["numero"], doc["progressivo"])
@@ -147,9 +149,10 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
     template_text = "\n".join([p.text for p in doc.paragraphs if p.text.strip()])
 
     # STEP 3b
+    # Filtro i chunk simili al template base
     documents = []
     removed_indices = []
-    similarity_threshold = 0.9
+    similarity_threshold=0.9
     for i, chunk in enumerate(chunks):
         sim_template = SequenceMatcher(None, chunk['content'], template_text).ratio()
         if sim_template < similarity_threshold:
@@ -158,6 +161,7 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
             removed_indices.append(i)
 
     if not documents:
+        # Se tutti i chunk sono simili al template, restituisco fallback
         return {
             "relevant_docs": [],
             "irrelevant_docs": list(range(len(chunks))),
@@ -219,16 +223,16 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
         }
     ]
 
+    # Costruisco il few-shot text
     few_shot_text = ""
     for ex in examples:
         docs_text = "\n".join([f"{i}: {d['titolo']} - {d['content']} (autore: {d['autore']}, cliente: {d['cliente']})" for i, d in enumerate(ex['documents'])])
         few_shot_text += f"Prompt utente: {ex['prompt']}\nDocumenti:\n{docs_text}\nDecisione: {json.dumps(ex['decision'])}\n\n"
-    
-    # Dopo max 15 docs. In caso di dubbio sulla rilevanza di un documento, preferisci includerlo.
+
     system_message = f"""
     Sei un assistente decisionale incaricato di filtrare e riordinare per rilevanza i documenti estratti da un sistema 
     di ricerca per il software gestionale SAM ERP2 dell'azienda Centro Software. 
-    Devi identificare quali documenti tra quelli estratti sono utili o potenzialmente utili per rispondere a una richiesta utente e coerenti con essa
+    Devi identificare quali documenti tra quelli estratti sono strettamente utili per rispondere a una richiesta utente e coerenti
     con essa nello specifico, tenendo sempre conto delle funzionalità standard e di quelle offerte solo tramite plugin/customizzazioni. 
     Durante la classificazione e la creazione delle liste di indici, riordina gli indici dei documenti utili in ordine crescente di rilevanza, dal meno al più rilevante.
 
@@ -243,8 +247,8 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
     Criteri di rilevanza:
     1. Un documento è rilevante se contiene informazioni concrete che aiutano a rispondere 
     alla richiesta, sia su funzionalità standard che su plugin/customizzazioni.
-    2. Un documento è accettabile anche se tratta l'argomento solo parzialmente o da una 
-    prospettiva correlata — escludilo solo se è chiaramente fuori tema rispetto alla richiesta.
+    2. Alcuni documenti possono essere solo moderatamente coerenti o riferirsi a plugin 
+    non pertinenti alla richiesta: questi vanno considerati non utili.
     3. Considera la differenza tra standard e plugin: se il prompt riguarda una funzionalità standard, anche documenti 
     sui plugin correlati possono essere utili, mentre se riguarda plugin specifici, concentrati sui documenti che li contengono.
 
@@ -259,6 +263,7 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
     {few_shot_text}
     """
 
+    # Prompt utente per il modello con i chunk reali
     docs_text = "\n".join([
         f"{i}: {d['titolo']} - {d['content']} "
         f"(autore: {d['autore']}, cliente: {d['cliente']}, "
@@ -267,6 +272,7 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
     ])
     user_message = f"{few_shot_text}Prompt utente: {user_prompt}\nDocumenti:\n{docs_text}\nDecisione:"
 
+    # Chiamata al modello
     response = client.chat.completions.create(
         model = MODEL_NAME,
         messages = [
@@ -278,23 +284,28 @@ def select_documents(user_prompt: str, chunks: list) -> dict:
 
     decision_text = response.choices[0].message.content
 
+    # Parsing JSON con fallback
     try:
         decision_filtered = json.loads(decision_text)
-        relevant_docs   = [documents[i] for i in decision_filtered.get("relevant_docs", [])]
-        irrelevant_docs = [documents[i] for i in decision_filtered.get("irrelevant_docs", [])]
+        # Ricostruiamo gli indici rispetto ai chunk originali
+        relevant_docs = [documents[i] for i in decision_filtered.get("relevant_docs", [])]
+        irrelevant_docs = removed_indices + [documents[i] for i in decision_filtered.get("irrelevant_docs", [])]
         decision = {
-            "relevant_docs":   relevant_docs,
-            "irrelevant_docs": irrelevant_docs,
-            "reason":          decision_filtered.get("reason", "Decisione generata dall'LLM")
+            "relevant_docs": [chunks.index(chunk) for chunk in relevant_docs],
+            "irrelevant_docs": [chunks.index(chunk) if isinstance(chunk, dict) else chunk for chunk in irrelevant_docs],
+            "reason": decision_filtered.get("reason", "Decisione generata dall'LLM")
         }
     except json.JSONDecodeError:
         decision = {
-            "relevant_docs":   [],
-            "irrelevant_docs": list(documents),
-            "reason":          f"Errore nel parsing della risposta: {decision_text}"
+            "relevant_docs": [],
+            "irrelevant_docs": list(range(len(documents))),
+            "reason": f"Errore nel parsing della risposta: {decision_text}"
         }
 
     return decision
+
+
+
 
 # 3. GENERAZIONE RISPOSTA FINALE =====================================================
 def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: list = None) -> str:
@@ -434,8 +445,7 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
     7. Genera l'output in formato markdown, così che possa essere utilizzato direttamente all'interno di un'interfaccia Streamlit.
     8. Se le informazioni fornite dall'utente nella query contraddicono quanto riportato nei documenti (ad esempio un'email, un nome cliente o un parametro errato), segnala esplicitamente la discrepanza e riporta il dato corretto trovato nei documenti, senza confermare il dato errato dell'utente.
     9. Rispondi direttamente in testo con formattazione markdown (header ###, bold **, elenchi puntati). Non wrappare mai la risposta in un blocco codice o fence markdown (```markdown o ```). Il testo deve iniziare direttamente con il contenuto.
-    10. Se la query dell'utente è ambigua e ammette interpretazioni multiple plausibili nell'ambito di SAM ERP2 (ad esempio "importazione automatica" può riferirsi a piani di consegna, movimenti contabili, EDI, ecc.), non rispondere a una sola interpretazione ignorando le altre. Riconosci esplicitamente l'ambiguità, elenca le possibili interpretazioni e chiedi all'utente di specificare, oppure copri tutte le interpretazioni plausibili distinguendole chiaramente nella risposta.
-
+    
     Esempi di risposta attesa:
     {few_shot_text}
     """
@@ -465,44 +475,48 @@ def generate_final_answer(user_prompt: str, selected_docs: list, chat_history: l
         stream=True,
     )
 
+    # Lettura dei token generati
     final_text = ""
     for event in response_stream:
         if not event.choices:
             continue
+
         choice = event.choices[0]
         delta = getattr(choice, "delta", None)
         if delta and getattr(delta, "content", None):
             token = delta.content
             final_text += token
-            yield token
+            yield token  # invia il token man mano che arriva
+            
 
 # FLUSSO COMPLETO DEL CHATBOT =====================================================
 def gpt_request(messages):
 
+    # Estrae l'ultimo prompt inserito dalla cronologia chat
     user_prompt = [m["content"] for m in messages if m["role"] == "user"][-1]
 
+    # Decisione strumenti di retrieval
     tools = decide_tools(user_prompt)
 
+    # STEP 2 - Recupero documenti
     all_documents = []
     if tools["use_semantic"]:
-        sem_docs = semantic_search(user_prompt, 15)
-        for d in sem_docs:
-            d["retrieval_sources"] = ["semantic"]
-        all_documents += sem_docs
+        print("\nUso la ricerca SEMANTICA\n")
+        all_documents += semantic_search(user_prompt, 15)
 
     if tools["use_keyword"]:
-        kw_docs = keyword_search(user_prompt, 15)
-        for d in kw_docs:
-            d["retrieval_sources"] = ["keyword"]
-        all_documents += kw_docs
+        print("\nUso la ricerca per KEYWORDS\n")
+        all_documents += keyword_search(user_prompt, 15)
 
+    # 2 - Selezione documenti in base alla coerenza
     document_selection = []
     selected_docs = []
     if tools["use_semantic"] or tools["use_keyword"]:
         if all_documents:
             document_selection = select_documents(user_prompt, all_documents)
-            selected_docs = document_selection['relevant_docs']
+            selected_docs = [all_documents[i] for i in document_selection['relevant_docs']]
 
+    # 3 - Genera risposta finale in modalità stream
     return generate_final_answer(user_prompt, selected_docs, messages)
 
 
@@ -511,22 +525,24 @@ def summarize_chat_history(chat_history, model_name=MODEL_NAME):
 
     if not chat_history:
         return ""
-
+    
     encoding = tiktoken.encoding_for_model(model_name)
-    max_tokens = 10000
+    max_tokens=10000
     reserved_tokens_for_summary = 2000
 
+    # Se la chat è più corta del limite, restituisci tutta la chat senza ulteriori elaborazioni
     token_counts = [len(encoding.encode(f"{'Utente' if m['role']=='user' else 'Assistente'}: {m['content']}\n")) for m in chat_history]
     total_tokens = sum(token_counts)
 
     if total_tokens <= max_tokens:
         return "".join(f"{'Utente' if m['role']=='user' else 'Assistente'}: {m['content']}\n" for m in chat_history)
-
+    
     recent_lines = []
-    old_lines    = []
+    old_lines = []
     recent_tokens = 0
-    old_tokens    = 0
+    old_tokens = 0
 
+    # Salvo messaggi più vecchi (inizio)
     for m, t in zip(chat_history, token_counts):
         if old_tokens + t <= (max_tokens - reserved_tokens_for_summary) // 2:
             role = "Utente" if m["role"] == "user" else "Assistente"
@@ -535,32 +551,35 @@ def summarize_chat_history(chat_history, model_name=MODEL_NAME):
         else:
             break
 
+    # Salvo messaggi più recenti (fine)
     for m, t in zip(reversed(chat_history), reversed(token_counts)):
         if recent_tokens + t <= (max_tokens - reserved_tokens_for_summary) // 2:
             role = "Utente" if m["role"] == "user" else "Assistente"
-            recent_lines.insert(0, f"{role}: {m['content']}\n")
+            recent_lines.insert(0, f"{role}: {m['content']}\n")  # inserisci in cima
             recent_tokens += t
         else:
             break
-
+    
+    # Riassumo messaggi centrali
     start_idx = len(old_lines)
-    end_idx   = len(chat_history) - len(recent_lines)
+    end_idx = len(chat_history) - len(recent_lines)
     central_messages = chat_history[start_idx:end_idx]
     summary_text = ""
     if central_messages:
         summary_text = summarize_old_messages(central_messages, reserved_tokens_for_summary)
         summary_text = f"Riassunto messaggi centrali: {summary_text}\n"
 
+    # Unisci tutto
     return "".join(old_lines) + summary_text + "".join(recent_lines)
 
-# RIASSUNTO MESSAGGI VECCHI =====================================================
+# RIASSUNTO MESSAGGI VECCHI
 def summarize_old_messages(messages, max_tokens):
 
-    model_name = MODEL_NAME
+    model_name=MODEL_NAME
 
     if not messages:
         return ""
-
+    
     system_prompt = """
     Sei un assistente che deve riassumere i messaggi della chat relativi al software gestionale SAM ERP2. 
     Il riassunto deve essere chiaro, breve e utile al contesto, mantenendo solo i concetti principali. 
@@ -571,154 +590,21 @@ def summarize_old_messages(messages, max_tokens):
     3. Il riassunto deve fornire un contesto sufficiente per permettere all'LLM di rispondere correttamente alle richieste successive.
     """
 
+    # Costruisci il testo
     text_to_summarize = ""
     for m in messages:
         role = "Utente" if m["role"] == "user" else "Assistente"
         text_to_summarize += f"{role}: {m['content']}\n"
-
+    
+    # Chimata LLM per riassunto
     response = client.chat.completions.create(
         model = model_name,
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": text_to_summarize}
+            {"role": "user", "content": text_to_summarize}
         ],
         temperature=0.35,
         max_tokens=max_tokens
     )
 
     return response.choices[0].message.content
-
-
-# PIPELINE COMPLETA PER LA VALUTAZIONE =====================================================
-def run_pipeline_for_evaluation(
-    user_prompt: str,
-    strategy: str,
-    top_k: int = 15,
-    chat_history: list = None,
-    semantic_weight: float = 0.7
-) -> dict:
-    chat_history = chat_history or []
-
-    tool_decision    = None
-    docs_after       = []
-    selection_reason = ""
-    t_selection      = 0.0
-
-    # ── Retrieval ────────────────────────────────────────────────────────
-    t0 = time.time()
-
-    if strategy == "multistage":
-        tool_decision = decide_tools(user_prompt)
-        use_semantic  = tool_decision["use_semantic"]
-        use_keyword   = tool_decision["use_keyword"]
-
-        all_docs = []
-        if use_semantic:
-            sem_docs = semantic_search(user_prompt, top_k)
-            for d in sem_docs:
-                d["retrieval_sources"] = ["semantic"]
-            all_docs += sem_docs
-        if use_keyword:
-            kw_docs = keyword_search(user_prompt, top_k)
-            for d in kw_docs:
-                d["retrieval_sources"] = ["keyword"]
-            all_docs += kw_docs
-
-        n_before    = len(all_docs)
-        t_retrieval = time.time() - t0
-
-        # ── Selezione LLM ────────────────────────────────────────────────
-        t1 = time.time()
-        if all_docs:
-            selection_result = select_documents(user_prompt, all_docs)
-            docs_after       = selection_result["relevant_docs"]
-            selection_reason = selection_result["reason"]
-        else:
-            docs_after       = []
-            selection_reason = "Nessun documento recuperato dal retriever."
-        t_selection = time.time() - t1
-
-        n_after = len(docs_after)
-
-    elif strategy == "hybrid":
-        keyword_weight = 1.0 - semantic_weight
-        sem_docs = semantic_search(user_prompt, top_n=top_k * 2)
-        for d in sem_docs:
-            d["retrieval_sources"] = ["semantic"]
-        kw_docs = keyword_search(user_prompt, top_n=top_k * 2)
-        for d in kw_docs:
-            d["retrieval_sources"] = ["keyword"]
-
-        combined = {}
-        for doc in sem_docs:
-            cid = f"{doc['numero']}_{doc['progressivo']}"
-            combined[cid] = {'doc': doc, 'score': doc['similarity'] * semantic_weight}
-        for doc in kw_docs:
-            cid = f"{doc['numero']}_{doc['progressivo']}"
-            norm_score = doc['score'] / (doc['score'] + 1)
-            if cid in combined:
-                combined[cid]['score'] += norm_score * keyword_weight
-            else:
-                combined[cid] = {'doc': doc, 'score': norm_score * keyword_weight}
-
-        sorted_results = sorted(combined.items(), key=lambda x: x[1]['score'], reverse=True)[:top_k]
-        docs_after  = [data['doc'] for _, data in sorted_results]
-        n_before    = len(docs_after)
-        n_after     = len(docs_after)
-        t_retrieval = time.time() - t0
-
-    elif strategy == "semantic":
-        docs = semantic_search(user_prompt, top_k)
-        for d in docs:
-            d["retrieval_sources"] = ["semantic"]
-        docs_after  = docs
-        n_before    = len(docs)
-        n_after     = len(docs)
-        t_retrieval = time.time() - t0
-
-    elif strategy == "keyword":
-        docs = keyword_search(user_prompt, top_k)
-        for d in docs:
-            d["retrieval_sources"] = ["keyword"]
-        docs_after  = docs
-        n_before    = len(docs)
-        n_after     = len(docs)
-        t_retrieval = time.time() - t0
-
-    else:
-        raise ValueError(
-            f"Strategia '{strategy}' non riconosciuta. "
-            f"Valori validi: 'multistage', 'hybrid', 'semantic', 'keyword'."
-        )
-
-    # ── Generation ───────────────────────────────────────────────────────
-    t2 = time.time()
-    try:
-        answer_gen = generate_final_answer(user_prompt, docs_after, chat_history)
-        if isinstance(answer_gen, types.GeneratorType):
-            generated_answer = ''.join(answer_gen)
-        elif isinstance(answer_gen, str):
-            generated_answer = answer_gen
-        else:
-            generated_answer = str(answer_gen)
-    except Exception as e:
-        generated_answer = f"[ERRORE GENERATION] {e}"
-
-    if not generated_answer or not generated_answer.strip():
-        generated_answer = "[RISPOSTA VUOTA]"
-
-    t_generation = time.time() - t2
-
-    return {
-        "tool_decision":        tool_decision,
-        "docs_after_selection": docs_after,
-        "selection_reason":     selection_reason,
-        "n_docs_before":        n_before,
-        "n_docs_after":         n_after,
-        "generated_answer":     generated_answer,
-        "timings": {
-            "retrieval_s":  t_retrieval,
-            "selection_s":  t_selection,
-            "generation_s": t_generation,
-        }
-    }

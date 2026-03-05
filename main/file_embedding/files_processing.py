@@ -74,7 +74,6 @@ def create_text_splitter(config: ChunkingConfig):
     
     elif config.strategy == ChunkingStrategy.RECURSIVE:
         print(f"Usando Recursive chunking con chunk size={config.chunk_size} overlap={config.chunk_overlap}")
-        #print(f"Separatori: {config.recursive_separators[:3]}...")
         return RecursiveCharacterTextSplitter(
             separators=config.recursive_separators,
             chunk_size=config.chunk_size,

@@ -19,16 +19,8 @@ def semantic_search(prompt, top_n=10):
             DECLARE @prompt VECTOR(1536) = CAST('{prompt_embedding_json}' AS VECTOR(1536));
 
             SELECT TOP (?)
-                ID,
-                NumRI,
-                Progressivo,
-                Cliente,
-                Titolo,
-                Autore,
-                Documento,
-                Url_doc,
-                Content,
-                Embedding,
+                ID, NumRI, Progressivo, Cliente, Titolo, 
+                Autore, Documento, Url_doc, Content, Embedding,
                 1 - VECTOR_DISTANCE('cosine', Embedding, @prompt) AS Similarity
             FROM DocumentChunks
             ORDER BY Similarity DESC;

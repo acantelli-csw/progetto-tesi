@@ -143,3 +143,9 @@ NOTE IMPORTANTI
 
 - La versione finale da usare nella pipeline di valutazione è gold_dataset_v4.json.
   Aggiorna GOLD_DATASET_PATH in evaluation_pipeline.py di conseguenza.
+
+REGOLA AGGIUNTIVA CRITICA:
+Puoi tagliare solo dall'inizio o dalla fine dello span originale.
+Non rimuovere mai testo dal mezzo — lo span risultante deve essere
+una sottostringa contigua del testo originale.
+Se il testo rilevante non è contiguo, mantieni lo span originale intero.

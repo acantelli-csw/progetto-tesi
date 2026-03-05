@@ -8,10 +8,6 @@ Pipeline completa per la valutazione quantitativa di sistemi RAG con:
 - Metriche di generation (Faithfulness, Answer Relevancy, Semantic Similarity)
 - Supporto per diverse strategie: Semantic, Keyword (BM25), Hybrid, Multi-stage
 - Supporto query negative: no_answer, correction, clarification
-
-Tesi Magistrale in Ingegneria Informatica e dell'IA
-Autore: Andrea Cantelli
-Data: Gennaio 2026
 """
 
 import os
@@ -20,6 +16,7 @@ import time
 import sys
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass, asdict, field
+from difflib import SequenceMatcher
 from pathlib import Path
 import numpy as np
 from datetime import datetime
@@ -48,6 +45,26 @@ class ExpectedBehavior:
 
 GOLD_DATASET_PATH = "C:/Users/ACantelli/OneDrive - centrosoftware.com/Documenti/GitHub/progetto-tesi/main/evaluation/gold_dataset.json"
 
+# Modello usato come giudice LLM in tutte le metriche di valutazione.
+# Si usa gpt-4.1 invece di modelli più leggeri per garantire coerenza
+# e affidabilità del giudizio su testo tecnico in italiano.
+JUDGE_MODEL = "gpt-4.1"
+
+# ---- Configurazione baseline per l'ablation study ----
+# Una sola variabile viene modificata per volta rispetto a questa baseline.
+# Scelta motivata da: chunking recursive custom (migliore per struttura RI),
+# ada-002 (modello embedding aziendale standard), multistage (strategia principale),
+# top_k=10 (compromesso contesto/qualità), gpt-4.1 (modello generativo principale).
+BASELINE_CONFIG = {
+    "name":              "Baseline",
+    "chunking":          "recursive_custom_1024",
+    "embedding_model":   "text-embedding-ada-002",
+    "search_strategy":   SearchStrategy.MULTISTAGE,
+    "top_k":             10,
+    "llm_model":         "gpt-4.1",
+    "semantic_weight":   0.7,
+}
+
 OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY")
 
 EMBEDDING_MODEL_1 = os.getenv("EMBEDDING_MODEL_1")
@@ -72,6 +89,7 @@ class EvaluationQuery:
     query_text:         str
     relevant_chunk_ids: List[str]
     relevant_doc_ids:   List[str]           = field(default_factory=list)
+    relevant_spans:     List[str]           = field(default_factory=list)
     reference_answer:   Optional[str]       = None
     # Campi specifici query negative (None = query positiva)
     expected_behavior:  Optional[str]       = None
@@ -80,6 +98,11 @@ class EvaluationQuery:
     @property
     def is_negative(self) -> bool:
         return self.expected_behavior is not None
+
+    @property
+    def has_spans(self) -> bool:
+        """True se il dataset è stato migrato al formato span-based."""
+        return len(self.relevant_spans) > 0
 
 @dataclass
 class RetrievalResult:
@@ -146,6 +169,7 @@ def load_gold_dataset(filepath: str) -> List[EvaluationQuery]:
             query_text         = item['query_text'],
             relevant_chunk_ids = item.get('relevant_chunk_ids', []),
             relevant_doc_ids   = item.get('relevant_doc_ids', []),
+            relevant_spans     = item.get('relevant_spans', []),
             reference_answer   = item.get('reference_answer'),
             expected_behavior  = item.get('expected_behavior'),
             negative_reason    = item.get('negative_reason')
@@ -199,11 +223,106 @@ def calculate_recall_at_k_normalized(
     top_k = retrieved_ids[:k]
     return sum(1 for doc_id in top_k if doc_id in relevant_ids) / min(k, len(relevant_ids))
 
+# ── Metriche span-centriche ───────────────────────────────────────────────────
+
+def _normalize_whitespace(text: str) -> str:
+    """
+    Normalizza whitespace in forma canonica per il confronto span-chunk.
+
+    Collassa qualsiasi sequenza di caratteri whitespace (spazi, tab, newline,
+    carriage return, spazi unificatori Unicode) in un singolo spazio.
+    Questo gestisce le differenze di formattazione introdotte dalla pipeline
+    DOCX → OCR → DB, dove lo stesso testo può avere 1, 4 o 8 spazi, tab,
+    o combinazioni miste.
+
+    Nota: si perde l'informazione sulla struttura a paragrafi, ma per il
+    confronto di copertura questo è accettabile — ci interessa solo se le
+    parole rilevanti sono presenti, non come sono disposte.
+    """
+    import re
+    return re.sub(r'\s+', ' ', text).strip()
+
+def chunk_covers_span(
+    chunk_text: str,
+    span:       str,
+    threshold:  float = 0.7
+) -> bool:
+    """
+    Verifica se un chunk recuperato copre uno span di riferimento.
+
+    Normalizza il whitespace prima del confronto per gestire le differenze
+    di formattazione introdotte dalla pipeline DOCX → OCR → DB
+    (tab vs spazi multipli, newline multipli, ecc.).
+
+    Prima controlla la sottostringa normalizzata (caso più comune).
+    Se fallisce, usa SequenceMatcher sui testi normalizzati con soglia
+    configurabile per gestire piccole differenze residue.
+
+    threshold=0.7 è conservativo: richiede che il 70% del testo dello span
+    sia comune con il chunk.
+    """
+    span_norm  = _normalize_whitespace(span)
+    chunk_norm = _normalize_whitespace(chunk_text)
+
+    if not span_norm:
+        return False
+
+    # Controllo sottostringa normalizzata
+    if span_norm in chunk_norm:
+        return True
+
+    # Fallback SequenceMatcher su testi normalizzati
+    ratio = SequenceMatcher(None, chunk_norm, span_norm).ratio()
+    return ratio >= threshold
+
+def calculate_span_precision_at_k(
+    retrieved_texts: List[str],
+    relevant_spans:  List[str],
+    k:               int,
+    threshold:       float = 0.7
+) -> float:
+    """
+    P@k span-based = chunk tra i top-k che coprono ≥1 span / k
+
+    Un chunk è "rilevante" se contiene almeno uno degli span di riferimento.
+    """
+    if k == 0 or not retrieved_texts or not relevant_spans:
+        return 0.0
+    top_k = retrieved_texts[:k]
+    relevant_count = sum(
+        1 for chunk in top_k
+        if any(chunk_covers_span(chunk, span, threshold) for span in relevant_spans)
+    )
+    return relevant_count / k
+
+def calculate_span_recall_at_k(
+    retrieved_texts: List[str],
+    relevant_spans:  List[str],
+    k:               int,
+    threshold:       float = 0.7
+) -> float:
+    """
+    R@k span-centrica = span coperti da ≥1 chunk tra i top-k / totale span
+
+    Risponde alla domanda: "quante delle informazioni necessarie per rispondere
+    sono state recuperate?". È invariante al chunking: se due span finiscono
+    nello stesso chunk, vengono entrambi coperti recuperando un solo documento.
+    """
+    if not relevant_spans:
+        return 0.0
+    top_k = retrieved_texts[:k]
+    covered = sum(
+        1 for span in relevant_spans
+        if any(chunk_covers_span(chunk, span, threshold) for chunk in top_k)
+    )
+    return covered / len(relevant_spans)
+
+
 def evaluate_chunk_relevance_with_llm(
     query:      str,
     chunk_text: str,
     client:     AzureOpenAI,
-    model:      str = "gpt-4o-mini"
+    model:      str = JUDGE_MODEL
 ) -> float:
     """
     Valuta la rilevanza di un chunk usando una rubrica discreta a 3 livelli
@@ -253,7 +372,7 @@ def calculate_average_chunk_relevance(
     query:             str,
     retrieved_chunks:  List[str],
     client:            AzureOpenAI,
-    model:             str = "gpt-4o-mini",
+    model:             str = JUDGE_MODEL,
     top_k:             Optional[int] = None
 ) -> float:
     chunks_to_eval = retrieved_chunks[:top_k] if top_k else retrieved_chunks
@@ -263,25 +382,40 @@ def calculate_average_chunk_relevance(
     return float(np.mean(scores))
 
 def evaluate_retrieval_for_query(
-    query:            EvaluationQuery,
-    retrieval_result: RetrievalResult,
-    client:           AzureOpenAI,
-    k_values:         List[int] = [1, 3, 5, 10],
-    llm_model:        str = "gpt-4o-mini"
+    query:              EvaluationQuery,
+    retrieval_result:   RetrievalResult,
+    client:             AzureOpenAI,
+    k_values:           List[int] = [1, 3, 5, 10],
+    llm_model:          str   = JUDGE_MODEL,
+    compute_doc_recall: bool  = False,
+    span_threshold:     float = 0.7
 ) -> Dict[str, float]:
     """
     Calcola le metriche di retrieval per una singola query positiva.
-    Per ogni k calcola:
-      - precision_at_k       (chunk-level, usa relevant_chunk_ids)
-      - recall_at_k          (chunk-level, standard)
-      - recall_at_k_norm     (chunk-level, normalizzata per min(k, |R|))
-      - doc_recall_at_k      (document-level, usa relevant_doc_ids — invariante al chunking)
-      - avg_chunk_relevance  (LLM-as-judge con rubrica discreta)
+
+    Metriche calcolate per ogni k:
+      Chunk-level (usa relevant_chunk_ids — dipende dal chunking):
+        precision_at_k       P@k chunk-based
+        recall_at_k          R@k standard
+        recall_at_k_norm     R@k normalizzata con min(k, |R|) al denominatore
+
+      Span-level (usa relevant_spans — invariante al chunking):
+        span_precision_at_k  P@k span-based: chunk top-k che coprono ≥1 span / k
+        span_recall_at_k     R@k span-centrica: span coperti da top-k / totale span
+        Disponibili solo dopo migrazione con migrate_to_spans.py.
+        Sono le metriche preferite per il confronto tra configurazioni di chunking.
+
+      Document-level (usa relevant_doc_ids — solo per confronto chunking):
+        doc_recall_at_k      Abilitato solo se compute_doc_recall=True.
+        Utile come fallback se gli span non sono disponibili.
+
+      LLM-as-judge:
+        avg_chunk_relevance_topk  Rilevanza media chunk top-k (rubrica 0/1/2)
     """
     metrics = {}
 
-    chunk_ids = retrieval_result.retrieved_chunk_ids
-    # Per doc-level: estrae il NumRI dai chunk recuperati
+    chunk_ids     = retrieval_result.retrieved_chunk_ids
+    chunk_texts   = retrieval_result.retrieved_chunk_texts
     retrieved_doc_ids = list(dict.fromkeys(cid.split("_")[0] for cid in chunk_ids))
 
     for k in k_values:
@@ -295,17 +429,25 @@ def evaluate_retrieval_for_query(
         metrics[f"recall_at_{k}_norm"] = calculate_recall_at_k_normalized(
             chunk_ids, query.relevant_chunk_ids, k
         )
-        # --- Document-level (utile per confronto tra chunking diversi) ---
-        if query.relevant_doc_ids:
+
+        # --- Span-level (se disponibili) ---
+        if query.has_spans:
+            metrics[f"span_precision_at_{k}"] = calculate_span_precision_at_k(
+                chunk_texts, query.relevant_spans, k, span_threshold
+            )
+            metrics[f"span_recall_at_{k}"] = calculate_span_recall_at_k(
+                chunk_texts, query.relevant_spans, k, span_threshold
+            )
+
+        # --- Document-level (solo per confronto chunking) ---
+        if compute_doc_recall and query.relevant_doc_ids:
             metrics[f"doc_recall_at_{k}"] = calculate_recall_at_k(
                 retrieved_doc_ids, query.relevant_doc_ids, k
             )
 
         # --- LLM-as-judge chunk relevance ---
         metrics[f"avg_chunk_relevance_top{k}"] = calculate_average_chunk_relevance(
-            query.query_text,
-            retrieval_result.retrieved_chunk_texts,
-            client, llm_model, top_k=k
+            query.query_text, chunk_texts, client, llm_model, top_k=k
         )
 
     metrics["retrieval_time"] = retrieval_result.retrieval_time
@@ -314,20 +456,109 @@ def evaluate_retrieval_for_query(
 
 # ==================== METRICHE DI GENERATION (QUERY POSITIVE) ====================
 
-def evaluate_faithfulness_with_llm(
-    context_chunks:   List[str],
+def _extract_atomic_claims(
     generated_answer: str,
     client:           AzureOpenAI,
-    model:            str = "gpt-4o-mini"
+    model:            str
+) -> List[str]:
+    """
+    Decompone la risposta generata in una lista di claim atomici verificabili
+    individualmente. Un claim atomico è una singola proposizione fattuale che
+    può essere confermata o smentita indipendentemente dalle altre.
+    """
+    prompt = f"""Sei un assistente specializzato nell'analisi di testi tecnici.
+
+Dato il seguente testo, estraine tutti i claim fattuali atomici — cioè le singole
+affermazioni di fatto che possono essere verificate indipendentemente.
+Ignora frasi introduttive, congiunzioni e parti non fattuali.
+
+Testo:
+\"\"\"
+{generated_answer}
+\"\"\"
+
+Rispondi SOLO con una lista JSON di stringhe, una per claim. Esempio:
+["L'email del cliente è info@esempio.com", "Il referente è Mario Rossi"]
+
+Se il testo non contiene claim fattuali verificabili (es. risposta di assenza info),
+rispondi con una lista vuota: []"""
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=400
+        )
+        text = response.choices[0].message.content.strip()
+        # Rimuove eventuali backtick markdown prima del parse
+        text = text.replace("```json", "").replace("```", "").strip()
+        claims = json.loads(text)
+        if isinstance(claims, list):
+            return [str(c) for c in claims]
+        return []
+    except Exception as e:
+        print(f"  Errore estrazione claim atomici: {e}")
+        return []
+
+def _verify_single_claim(
+    claim:        str,
+    context_text: str,
+    client:       AzureOpenAI,
+    model:        str
 ) -> float:
     """
-    Valuta la fedeltà della risposta al contesto con rubrica discreta a 3 livelli.
+    Verifica se un singolo claim atomico è supportato dal contesto.
+    Ritorna 1.0 se supportato, 0.5 se parzialmente, 0.0 se non supportato.
     """
-    context_text = "\n\n".join(context_chunks)
-
     prompt = f"""Sei un valutatore esperto di sistemi RAG.
 
 Contesto (estratto dai documenti):
+\"\"\"
+{context_text}
+\"\"\"
+
+Claim da verificare: "{claim}"
+
+Il contesto supporta questo claim?
+
+Rispondi SOLO con uno di questi valori:
+- SUPPORTATO   (il contesto conferma esplicitamente il claim)
+- PARZIALE     (il contesto è correlato ma non conferma esplicitamente)
+- NON_SUPPORTATO (il claim non è presente o è contraddetto dal contesto)
+
+Risposta:"""
+
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.0,
+            max_tokens=10
+        )
+        verdict = response.choices[0].message.content.strip().upper()
+        if   "NON_SUPPORTATO" in verdict: return 0.0
+        elif "PARZIALE"        in verdict: return 0.5
+        elif "SUPPORTATO"      in verdict: return 1.0
+        return 0.0
+    except Exception as e:
+        print(f"  Errore verifica claim: {e}")
+        return 0.0
+
+def _faithfulness_rubric_fallback(
+    context_chunks:   List[str],
+    generated_answer: str,
+    client:           AzureOpenAI,
+    model:            str
+) -> float:
+    """
+    Valutazione di fallback con rubrica discreta 0/1/2 quando l'estrazione
+    dei claim atomici non produce risultati (es. risposta troppo breve).
+    """
+    context_text = "\n\n".join(context_chunks)
+    prompt = f"""Sei un valutatore esperto di sistemi RAG.
+
+Contesto:
 \"\"\"
 {context_text}
 \"\"\"
@@ -337,15 +568,12 @@ Risposta generata:
 {generated_answer}
 \"\"\"
 
-Valuta la fedeltà della risposta al contesto seguendo questa rubrica:
+Rubrica:
 - 0 = La risposta contiene informazioni non presenti nel contesto (allucinazioni)
 - 1 = La risposta è parzialmente fedele: alcune informazioni sono nel contesto, altre no
 - 2 = La risposta è completamente fedele: ogni informazione è supportata dal contesto
 
-Ragiona brevemente (1-2 frasi), poi emetti il voto.
-
-Formato risposta (rispetta esattamente):
-Ragionamento: <testo>
+Ragionamento: <1-2 frasi>
 Voto: <0, 1 o 2>"""
 
     try:
@@ -362,17 +590,63 @@ Voto: <0, 1 o 2>"""
                 return max(0.0, min(1.0, score / 2.0))
         return 0.0
     except Exception as e:
-        print(f"  Errore valutazione faithfulness: {e}")
+        print(f"  Errore fallback faithfulness: {e}")
         return 0.0
+
+def evaluate_faithfulness_with_llm(
+    context_chunks:   List[str],
+    generated_answer: str,
+    client:           AzureOpenAI,
+    model:            str = JUDGE_MODEL
+) -> Tuple[float, int, int]:
+    """
+    Valuta la fedeltà della risposta al contesto usando claim atomici.
+
+    Approccio (ispirato a RAGAS, Es et al. 2023):
+    1. Decompone la risposta in claim atomici verificabili individualmente.
+    2. Per ogni claim verifica se è supportato dal contesto recuperato.
+    3. Score = claims_supportati / claims_totali.
+
+    Un claim conta come 1.0 se SUPPORTATO, 0.5 se PARZIALE, 0.0 se NON_SUPPORTATO.
+    Se l'estrazione dei claim fallisce o produce lista vuota, usa la rubrica
+    discreta come fallback (risposta breve / assenza info).
+
+    Ritorna: (score, n_claims_totali, n_claims_supportati)
+    """
+    context_text = "\n\n".join(context_chunks)
+
+    # Step 1: estrazione claim
+    claims = _extract_atomic_claims(generated_answer, client, model)
+
+    if not claims:
+        # Fallback: risposta senza claim fattuali verificabili
+        # (tipico delle risposte "non ho informazioni" — correttamente fedele)
+        fallback_score = _faithfulness_rubric_fallback(
+            context_chunks, generated_answer, client, model
+        )
+        return fallback_score, 0, 0
+
+    # Step 2: verifica ogni claim
+    scores = [_verify_single_claim(c, context_text, client, model) for c in claims]
+
+    faith_score       = float(np.mean(scores))
+    n_supported       = sum(1 for s in scores if s >= 1.0)
+
+    print(f"    Faithfulness: {len(claims)} claim, "
+          f"{n_supported} supportati, score={faith_score:.3f}")
+
+    return faith_score, len(claims), n_supported
 
 def evaluate_answer_relevancy_with_llm(
     query:            str,
     generated_answer: str,
     client:           AzureOpenAI,
-    model:            str = "gpt-4o-mini"
+    model:            str = JUDGE_MODEL
 ) -> float:
     """
     Valuta la pertinenza della risposta rispetto alla query con rubrica discreta.
+    Si valuta solo la qualità della risposta generata per le query positive —
+    le query negative hanno un sistema di valutazione dedicato (evaluate_negative_query).
     """
     prompt = f"""Sei un valutatore esperto di sistemi RAG.
 
@@ -429,22 +703,28 @@ def evaluate_generation_for_query(
     query:             EvaluationQuery,
     generation_result: GenerationResult,
     client:            AzureOpenAI,
-    llm_model:         str = "gpt-4o-mini",
+    llm_model:         str = JUDGE_MODEL,
     embedding_model:   str = "text-embedding-3-large"
 ) -> Dict[str, float]:
 
     metrics = {}
 
-    metrics["faithfulness"] = evaluate_faithfulness_with_llm(
+    # Faithfulness con claim atomici — ritorna (score, n_claims, n_supported)
+    faith_score, n_claims, n_supported = evaluate_faithfulness_with_llm(
         generation_result.context_chunks,
         generation_result.generated_answer,
         client, llm_model
     )
+    metrics["faithfulness"]       = faith_score
+    metrics["faithfulness_claims_total"]     = float(n_claims)
+    metrics["faithfulness_claims_supported"] = float(n_supported)
+
     metrics["answer_relevancy"] = evaluate_answer_relevancy_with_llm(
         query.query_text,
         generation_result.generated_answer,
         client, llm_model
     )
+
     if query.reference_answer:
         metrics["semantic_similarity"] = calculate_semantic_similarity_embeddings(
             query.reference_answer,
@@ -463,7 +743,7 @@ def evaluate_no_answer_behavior(
     query:            EvaluationQuery,
     generated_answer: str,
     client:           AzureOpenAI,
-    model:            str = "gpt-4o-mini"
+    model:            str = JUDGE_MODEL
 ) -> Tuple[float, str, str]:
     """
     Verifica se il sistema ha correttamente dichiarato di non avere informazioni
@@ -517,7 +797,7 @@ def evaluate_correction_behavior(
     query:            EvaluationQuery,
     generated_answer: str,
     client:           AzureOpenAI,
-    model:            str = "gpt-4o-mini"
+    model:            str = JUDGE_MODEL
 ) -> Tuple[float, str, str]:
     """
     Verifica se il sistema ha identificato e corretto il dato errato presente
@@ -571,7 +851,7 @@ def evaluate_clarification_behavior(
     query:            EvaluationQuery,
     generated_answer: str,
     client:           AzureOpenAI,
-    model:            str = "gpt-4o-mini"
+    model:            str = JUDGE_MODEL
 ) -> Tuple[float, str, str]:
     """
     Verifica se il sistema ha gestito correttamente una query ambigua,
@@ -625,7 +905,7 @@ def evaluate_negative_query(
     query:             EvaluationQuery,
     generation_result: GenerationResult,
     client:            AzureOpenAI,
-    model:             str = "gpt-4o-mini"
+    model:             str = JUDGE_MODEL
 ) -> NegativeEvaluationResult:
     """
     Router principale per la valutazione delle query negative.
@@ -945,7 +1225,7 @@ def aggregate_tool_selection_stats(retrieval_results: List[RetrievalResult]) -> 
 def run_generation_with_llm(
     queries:          List[EvaluationQuery],
     retrieval_results: List[RetrievalResult],
-    llm_model:        str = "gpt-4o-mini"
+    llm_model:        str = JUDGE_MODEL
 ) -> List[GenerationResult]:
 
     generation_results = []
@@ -1013,14 +1293,15 @@ def run_generation_with_llm(
 # ==================== VALUTAZIONE COMPLETA ====================
 
 def run_full_evaluation(
-    gold_queries:       List[EvaluationQuery],
-    retrieval_results:  List[RetrievalResult],
-    generation_results: List[GenerationResult],
-    configuration:      Dict,
-    client:             AzureOpenAI,
-    k_values:           List[int] = [5, 10],
-    llm_model:          str = "gpt-4o-mini",
-    embedding_model:    str = "text-embedding-3-large"
+    gold_queries:        List[EvaluationQuery],
+    retrieval_results:   List[RetrievalResult],
+    generation_results:  List[GenerationResult],
+    configuration:       Dict,
+    client:              AzureOpenAI,
+    k_values:            List[int] = [5, 10],
+    llm_model:           str = JUDGE_MODEL,
+    embedding_model:     str = "text-embedding-3-large",
+    compute_doc_recall:  bool = False   # Abilitare solo per esperimento chunking
 ) -> TestResult:
 
     start_time = time.time()
@@ -1063,7 +1344,8 @@ def run_full_evaluation(
             # --- Valutazione query positiva ---
             print("  - Metriche retrieval...")
             ret_metrics = evaluate_retrieval_for_query(
-                query, ret, client, k_values, llm_model
+                query, ret, client, k_values, llm_model,
+                compute_doc_recall=compute_doc_recall
             )
             per_query_retrieval_metrics.append(ret_metrics)
 
@@ -1153,7 +1435,8 @@ def compare_test_results(test_results: List[TestResult]):
     print("="*130)
 
     col = 38
-    print(f"\n{'Configurazione':<{col}} {'P@5':>7} {'R@5':>7} {'R@5n':>7} {'LLM-Rel':>8} {'Faith':>7} {'Relev':>7} {'SemSim':>7} {'Robust':>8}")
+    col = 38
+    print(f"\n{'Configurazione':<{col}} {'P@5':>7} {'R@5':>7} {'R@5n':>7} {'SpR@5':>7} {'LLM-Rel':>8} {'Faith':>7} {'Relev':>7} {'SemSim':>7} {'Robust':>8}")
     print("-"*130)
 
     for result in test_results:
@@ -1161,34 +1444,36 @@ def compare_test_results(test_results: List[TestResult]):
         p5      = result.retrieval_metrics.get('avg_precision_at_5', 0.0)
         r5      = result.retrieval_metrics.get('avg_recall_at_5', 0.0)
         r5n     = result.retrieval_metrics.get('avg_recall_at_5_norm', 0.0)
+        spr5    = result.retrieval_metrics.get('avg_span_recall_at_5', 0.0)
         llmrel  = result.retrieval_metrics.get('avg_avg_chunk_relevance_top5', 0.0)
         faith   = result.generation_metrics.get('avg_faithfulness', 0.0)
         relev   = result.generation_metrics.get('avg_answer_relevancy', 0.0)
         semsim  = result.generation_metrics.get('avg_semantic_similarity') or 0.0
         robust  = result.negative_eval_metrics.get('robustness_overall', 0.0)
 
-        print(f"{name:<{col}} {p5:>7.4f} {r5:>7.4f} {r5n:>7.4f} {llmrel:>8.4f} {faith:>7.4f} {relev:>7.4f} {semsim:>7.4f} {robust:>8.4f}")
+        print(f"{name:<{col}} {p5:>7.4f} {r5:>7.4f} {r5n:>7.4f} {spr5:>7.4f} {llmrel:>8.4f} {faith:>7.4f} {relev:>7.4f} {semsim:>7.4f} {robust:>8.4f}")
 
     print("="*130)
     print("\nLegenda:")
     print("  P@5     = Precision@5 (chunk-level)")
     print("  R@5     = Recall@5 standard (chunk-level)")
     print("  R@5n    = Recall@5 normalizzata — denominatore min(5, |R|)")
+    print("  SpR@5   = Span Recall@5 — span coperti tra top-5 / totale span  (0.0 se no spans)")
     print("  LLM-Rel = LLM-as-judge chunk relevance (rubrica 0/1/2, media top-5)")
-    print("  Faith   = Faithfulness (LLM-as-judge, rubrica 0/1/2)")
+    print("  Faith   = Faithfulness con claim atomici (LLM-as-judge)")
     print("  Relev   = Answer Relevancy (LLM-as-judge, rubrica 0/1/2)")
     print("  SemSim  = Semantic Similarity (cosine su embeddings)")
     print("  Robust  = Robustezza su query negative (0=fallisce, 1=gestisce correttamente)")
     print()
 
-
 # ==================== TEST PRINCIPALE ====================
 
 def run_test_with_your_pipeline(
-    gold_dataset_path: str,
-    configuration:     dict,
-    search_strategy:   str = SearchStrategy.SEMANTIC,
-    results_dir:       str = "evaluation_results"
+    gold_dataset_path:  str,
+    configuration:      dict,
+    search_strategy:    str  = SearchStrategy.SEMANTIC,
+    results_dir:        str  = "evaluation_results",
+    compute_doc_recall: bool = False
 ):
     print("\n" + "="*70)
     print(f"TEST: {configuration.get('name', 'Unnamed')}")
@@ -1225,14 +1510,15 @@ def run_test_with_your_pipeline(
     client = load_openai_client()
 
     test_result = run_full_evaluation(
-        gold_queries       = gold_queries,
-        retrieval_results  = retrieval_results,
-        generation_results = generation_results,
-        configuration      = configuration,
-        client             = client,
-        k_values           = [3, 5, 10],
-        llm_model          = "gpt-4o-mini",
-        embedding_model    = "text-embedding-3-large"
+        gold_queries        = gold_queries,
+        retrieval_results   = retrieval_results,
+        generation_results  = generation_results,
+        configuration       = configuration,
+        client              = client,
+        k_values            = [3, 5, 10],
+        llm_model           = JUDGE_MODEL,
+        embedding_model     = "text-embedding-3-large",
+        compute_doc_recall  = compute_doc_recall
     )
 
     print_test_result(test_result)
@@ -1338,7 +1624,134 @@ def esempio_confronto_strategie():
     compare_test_results(results)
 
 
-# ==================== MAIN ====================
+# ==================== ABLATION STUDY ====================
+
+def run_ablation_study(
+    gold_dataset_path: str       = GOLD_DATASET_PATH,
+    results_dir:       str       = "evaluation_results/ablation",
+    dimensions:        List[str] = None
+) -> Dict[str, TestResult]:
+    """
+    Ablation study sequenziale: parte dalla BASELINE_CONFIG e varia
+    una dimensione per volta, mantenendo tutto il resto fisso.
+
+    Dimensioni disponibili:
+      A) Strategia di search   : multistage (baseline) | hybrid | semantic | keyword
+      B) Tipo di chunking       : recursive_custom_1024 (baseline) | fixed_512 | recursive_standard_1024
+      C) Dimensione chunk       : 1024/overlap150 (baseline) | 512/overlap100
+      D) Modello embedding      : ada-002 (baseline) | text-embedding-3-large
+      E) Modello LLM generativo : gpt-4.1 (baseline) | gpt-5
+      F) Top-k documenti        : 10 (baseline) | 8 | 15
+
+    Parametri:
+      dimensions: lista opzionale di lettere per eseguire solo i gruppi
+                  specificati. Se None, esegue tutto. Esempi:
+                    run_ablation_study(dimensions=["A", "E", "F"])
+                    run_ablation_study(dimensions=["B", "C"])
+                    run_ablation_study(dimensions=["D"])
+
+                  Utile per sessioni separate in base al DB attivo:
+                    - DB baseline (recursive custom 1024, ada-002) : ["A", "E", "F"]
+                    - DB re-indicizzato con fixed 512              : ["B", "C"]
+                    - DB re-indicizzato con recursive standard     : ["B"]  (solo B3)
+                    - DB re-indicizzato con embedding-3-large      : ["D"]
+
+    Per B e C viene abilitato automaticamente compute_doc_recall=True,
+    poiché i chunk ID cambiano al variare del chunking e la metrica
+    document-level è l'unico confronto stabile tra configurazioni diverse.
+    """
+    active = set(d.upper() for d in dimensions) if dimensions else None
+
+    results: Dict[str, TestResult] = {}
+    all_configs = []
+
+    # ── A: Strategia di search ──────────────────────────────────────────
+    if active is None or "A" in active:
+        for strategy, name in [
+            (SearchStrategy.MULTISTAGE, "A1_multistage_baseline"),
+            (SearchStrategy.HYBRID,     "A2_hybrid_fixed"),
+            (SearchStrategy.SEMANTIC,   "A3_semantic_only"),
+            (SearchStrategy.KEYWORD,    "A4_keyword_only"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "search_strategy": strategy}
+            all_configs.append(("A", cfg, strategy, False))
+
+    # ── B: Tipo di chunking (doc_recall abilitato) ───────────────────────
+    if active is None or "B" in active:
+        for chunking, name in [
+            ("recursive_custom_1024",   "B1_recursive_custom_baseline"),
+            ("fixed_512",               "B2_fixed_size_512"),
+            ("recursive_standard_1024", "B3_recursive_standard_1024"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "chunking": chunking}
+            all_configs.append(("B", cfg, BASELINE_CONFIG["search_strategy"], True))
+
+    # ── C: Dimensione chunk (doc_recall abilitato) ────────────────────────
+    if active is None or "C" in active:
+        for chunk_size, overlap, name in [
+            (1024, 150, "C1_chunk1024_overlap150_baseline"),
+            (512,  100, "C2_chunk512_overlap100"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name,
+                   "chunk_size": chunk_size, "chunk_overlap": overlap}
+            all_configs.append(("C", cfg, BASELINE_CONFIG["search_strategy"], True))
+
+    # ── D: Modello embedding ─────────────────────────────────────────────
+    if active is None or "D" in active:
+        for emb_model, name in [
+            ("text-embedding-ada-002", "D1_ada002_baseline"),
+            ("text-embedding-3-large", "D2_embedding3large"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "embedding_model": emb_model}
+            all_configs.append(("D", cfg, BASELINE_CONFIG["search_strategy"], False))
+
+    # ── E: Modello LLM generativo ────────────────────────────────────────
+    if active is None or "E" in active:
+        for llm_model, name in [
+            ("gpt-4.1", "E1_gpt41_baseline"),
+            ("gpt-5",   "E2_gpt5"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "llm_model": llm_model}
+            all_configs.append(("E", cfg, BASELINE_CONFIG["search_strategy"], False))
+
+    # ── F: Top-k ─────────────────────────────────────────────────────────
+    if active is None or "F" in active:
+        for top_k, name in [
+            (10, "F1_topk10_baseline"),
+            (8,  "F2_topk8"),
+            (15, "F3_topk15"),
+        ]:
+            cfg = {**BASELINE_CONFIG, "name": name, "top_k": top_k}
+            all_configs.append(("F", cfg, BASELINE_CONFIG["search_strategy"], False))
+
+    if not all_configs:
+        print(f"Nessuna dimensione valida tra quelle specificate: {dimensions}")
+        return results
+
+    # ── Esecuzione ────────────────────────────────────────────────────────
+    total = len(all_configs)
+    dims_label = ", ".join(sorted(active)) if active else "A-F"
+    print(f"\n{'='*70}")
+    print(f"ABLATION STUDY — dimensioni: {dims_label} ({total} esperimenti)")
+    print(f"{'='*70}\n")
+
+    for i, (dimension, cfg, strategy, use_doc_recall) in enumerate(all_configs, 1):
+        print(f"\n[{i}/{total}] [{dimension}]  {cfg['name']}")
+        result = run_test_with_your_pipeline(
+            gold_dataset_path  = gold_dataset_path,
+            configuration      = cfg,
+            search_strategy    = strategy,
+            results_dir        = results_dir,
+            compute_doc_recall = use_doc_recall
+        )
+        results[cfg["name"]] = result
+
+    print(f"\n{'='*70}")
+    print(f"ABLATION STUDY COMPLETATO — {len(results)}/{total} esperimenti")
+    print(f"{'='*70}")
+    compare_test_results(list(results.values()))
+    return results
+
 
 def main():
     print("="*70)
@@ -1350,14 +1763,16 @@ def main():
     print("3. Hybrid Search (semantic + keyword)")
     print("4. Multi-stage (tool selection adattivo)")
     print("5. Confronto tutte le strategie")
+    print("6. Ablation study completo")
 
-    choice = input("\nSelezione (1-5): ").strip()
+    choice = input("\nSelezione (1-6): ").strip()
 
     if   choice == "1": esempio_test_semantic_search()
     elif choice == "2": esempio_test_keyword_search()
     elif choice == "3": esempio_test_hybrid_search()
     elif choice == "4": esempio_test_multistage()
     elif choice == "5": esempio_confronto_strategie()
+    elif choice == "6": run_ablation_study()
     else:               print("Selezione non valida")
 
 

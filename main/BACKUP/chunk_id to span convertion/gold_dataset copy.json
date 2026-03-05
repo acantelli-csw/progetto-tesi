@@ -1,0 +1,17 @@
+[
+
+  {
+    "query_id": "Q001",
+    "query_text": "In che modo l'automazione dei processi contabili...",
+    "relevant_chunk_ids": ["55459_1","55459_2","55459_3"],
+    "reference_answer": "L'automazione dei processi contabili...",
+    "relevant_spans": [
+      "Richiesta Cliente\nVersione 5.0\nIl cliente utilizza le ripartizioni mensili...",
+      "Ribaltamento in contabilità analitica con compilazione del campo Riferi1...",
+      "Una prima scrittura storna totalmente il conto di partenza e apre il conto..." 
+    ],  
+    "expected_behavior": null,
+    "negative_reason": null
+  }
+
+]
