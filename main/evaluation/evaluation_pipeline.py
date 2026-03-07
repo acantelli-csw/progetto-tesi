@@ -850,7 +850,7 @@ def evaluate_generation_for_query(
     generation_result: GenerationResult,
     client:            AzureOpenAI,
     llm_model:         str = JUDGE_MODEL,
-    embedding_model:   str = "text-embedding-3-large"
+    embedding_model:   str = "text-embedding-ada-002"
 ) -> Dict[str, float]:
 
     metrics = {}
