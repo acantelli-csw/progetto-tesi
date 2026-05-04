@@ -266,7 +266,7 @@ def main():
     # SCEGLI LA CONFIGURAZIONE DA USARE
 
     selected_config = config_recursive
-    limit = 300 # Numero max di file da elaborare
+    limit = 350 # Numero max di file da elaborare
     process_files(selected_config, limit)
 
 

@@ -73,9 +73,6 @@ class ExpectedBehavior:
 
 GOLD_DATASET_PATH = "C:/Users/ACantelli/OneDrive - centrosoftware.com/Documenti/GitHub/progetto-tesi/main/evaluation/gold_dataset.json"
 
-# Modello usato come giudice LLM in tutte le metriche di valutazione.
-JUDGE_MODEL = "gpt-4.1"
-
 # ---- Configurazione baseline per l'ablation study ----
 
 BASELINE_CONFIG = {
@@ -91,14 +88,6 @@ BASELINE_CONFIG = {
 }
 
 OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY")
-
-EMBEDDING_MODEL_1   = os.getenv("EMBEDDING_MODEL_1")
-EMBEDDING_URL_1     = os.getenv("EMBEDDING_URL_1")
-EMBEDDING_VERSION_1 = os.getenv("EMBEDDING_VERSION_1")
-
-EMBEDDING_MODEL_2   = os.getenv("EMBEDDING_MODEL_2")
-EMBEDDING_URL_2     = os.getenv("EMBEDDING_URL_2")
-EMBEDDING_VERSION_2 = os.getenv("EMBEDDING_VERSION_2")
 
 LLM_MODEL   = os.getenv("LLM_MODEL")
 LLM_URL     = os.getenv("LLM_URL")
@@ -191,11 +180,12 @@ class TestResult:
 
 # ==================== FUNZIONI DI UTILITÀ ====================
 
-def load_openai_client(api_key: Optional[str] = None) -> AzureOpenAI:
+JUDGE_MODEL = os.getenv("JUDGE_MODEL")
+def load_openai_client() -> AzureOpenAI:
     return AzureOpenAI(
-        azure_endpoint=os.getenv("LLM_URL"),
-        api_key=os.getenv("OPENAI_API_KEY"),
-        api_version=os.getenv("LLM_VERSION")
+        azure_endpoint = os.getenv("JUDGE_URL"),
+        api_key        = os.getenv("OPENAI_API_KEY"),
+        api_version    = os.getenv("JUDGE_VERSION")
     )
 
 def cosine_similarity(vec1: List[float], vec2: List[float]) -> float:
@@ -239,53 +229,51 @@ def _normalize_whitespace(text: str) -> str:
     import re
     return re.sub(r'\s+', ' ', text).strip()
 
-def chunk_covers_span(
+def chunk_covers_span_partial(
     chunk_text: str,
     span:       str,
-    threshold:  float = 0.7
-) -> bool:
+    min_coverage: float = 0.5
+) -> float:
     """
-    Verifica se un chunk recuperato copre uno span di riferimento.
-
-    Normalizza il whitespace prima del confronto per gestire le differenze
-    di formattazione introdotte dalla pipeline DOCX → OCR → DB.
-
-    Prima controlla la sottostringa normalizzata (caso più comune).
-    Se fallisce, usa SequenceMatcher sui testi normalizzati con soglia
-    configurabile per gestire piccole differenze residue.
-
-    threshold=0.7: richiede che il 70% del testo dello span sia comune
-    con il chunk.
+    Ritorna la frazione dello span coperta dal chunk.
+    Un chunk copre lo span se contiene almeno min_coverage
+    della sua lunghezza come sottosequenza comune.
     """
     span_norm  = _normalize_whitespace(span)
     chunk_norm = _normalize_whitespace(chunk_text)
 
     if not span_norm:
-        return False
+        return 0.0
 
+    # Sottostringa esatta — copertura totale
     if span_norm in chunk_norm:
-        return True
+        return 1.0
 
-    ratio = SequenceMatcher(None, chunk_norm, span_norm).ratio()
-    return ratio >= threshold
+    # Stima della copertura tramite longest common substring
+    matcher = SequenceMatcher(None, chunk_norm, span_norm)
+    lcs_len = sum(block.size for block in matcher.get_matching_blocks())
+    return lcs_len / len(span_norm)
 
 def calculate_span_precision_at_k(
     retrieved_texts: List[str],
     relevant_spans:  List[str],
     k:               int,
-    threshold:       float = 0.7
+    min_coverage:    float = 0.5
 ) -> float:
     """
-    P@k span-based = chunk tra i top-k che coprono ≥1 span / k
-
-    Un chunk è "rilevante" se contiene almeno uno degli span di riferimento.
+    P@k span-based con copertura parziale.
+    Un chunk è "rilevante" se copre >= min_coverage di almeno uno span.
     """
     if k == 0 or not retrieved_texts or not relevant_spans:
         return 0.0
     top_k = retrieved_texts[:k]
     relevant_count = sum(
         1 for chunk in top_k
-        if any(chunk_covers_span(chunk, span, threshold) for span in relevant_spans)
+        if max(
+            (chunk_covers_span_partial(chunk, span, min_coverage)
+             for span in relevant_spans),
+            default=0.0
+        ) >= min_coverage
     )
     return relevant_count / k
 
@@ -293,22 +281,21 @@ def calculate_span_recall_at_k(
     retrieved_texts: List[str],
     relevant_spans:  List[str],
     k:               int,
-    threshold:       float = 0.7
+    min_coverage:    float = 0.5
 ) -> float:
-    """
-    R@k span-centrica = span coperti da ≥1 chunk tra i top-k / totale span
-
-    Risponde alla domanda: "quante delle informazioni necessarie per rispondere
-    sono state recuperate?". È invariante al chunking: se due span finiscono
-    nello stesso chunk, vengono entrambi coperti recuperando un solo documento.
-    """
+    top_k = retrieved_texts[:k]
     if not relevant_spans:
         return 0.0
-    top_k = retrieved_texts[:k]
-    covered = sum(
-        1 for span in relevant_spans
-        if any(chunk_covers_span(chunk, span, threshold) for chunk in top_k)
-    )
+    covered = 0
+    for span in relevant_spans:
+        # Lo span è coperto se almeno un chunk copre >= min_coverage
+        max_cov = max(
+            (chunk_covers_span_partial(chunk, span, min_coverage)
+             for chunk in top_k),
+            default=0.0
+        )
+        if max_cov >= min_coverage:
+            covered += 1
     return covered / len(relevant_spans)
 
 def evaluate_chunk_relevance_with_llm(
@@ -1658,8 +1645,8 @@ def run_ablation_study(
     # ── B: Modello LLM generativo (no re-indicizzazione) ─────────────────────
     if active is None or "B" in active:
         for llm_model, name in [
-            ("gpt-4.1", "B1_gpt41_baseline"),
-            ("gpt-5",   "B2_gpt5"),
+            #("gpt-4.1", "B1_gpt41_baseline"),
+            #("gpt-5",   "B2_gpt5"),
         ]:
             cfg = {**BASELINE_CONFIG, "name": name, "llm_model": llm_model}
             all_configs.append(("B", cfg, BASELINE_CONFIG["search_strategy"]))
@@ -1667,8 +1654,9 @@ def run_ablation_study(
     # ── C: Top-k (no re-indicizzazione) ──────────────────────────────────────
     if active is None or "C" in active:
         for top_k, name in [
-            (15, "C1_topk15_baseline"),
-            (5,  "C2_topk5"),
+            #(15, "C1_topk15_baseline"),
+            #(5,  "C2_topk5"),
+            (10, "C3_topk10"),
         ]:
             cfg = {**BASELINE_CONFIG, "name": name, "top_k": top_k}
             all_configs.append(("C", cfg, BASELINE_CONFIG["search_strategy"]))

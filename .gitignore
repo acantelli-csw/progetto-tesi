@@ -13,8 +13,14 @@ __pycache__/
 *.egg-info/
 uv.lock
 
+# Backup files
+main/Backup
+
 # User credentials and chat histories
 chat_history
 users.json
 reverse_index/*
 testset_ragas.json
+
+# Test results
+evaluation_results/

@@ -582,7 +582,7 @@ def summarize_old_messages(messages, max_tokens):
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": text_to_summarize}
         ],
-        temperature=0.35,
+        temperature=0.3,
         max_tokens=max_tokens
     )
 
