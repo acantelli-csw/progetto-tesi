@@ -14,7 +14,7 @@ __pycache__/
 uv.lock
 
 # User credentials and chat histories
-chat_history
+chat_history/*
 users.json
 reverse_index/*
 testset_ragas.json
